@@ -62,8 +62,15 @@ class Oli_CF_Mailer {
 		return array(
 			'to'                 => (string) get_option( 'admin_email' ),
 			'from'               => (string) get_option( 'admin_email' ),
-			'subject'            => 'New message from [your-name]',
-			'body'               => "From: [your-name] <[your-email]>\nSubject: [your-subject]\n\nMessage:\n[your-message]",
+			'subject'            => __( 'New message from [your-name]', 'oli-contact-form' ),
+			'body'               => sprintf(
+				/* translators: 1: [your-name] tag, 2: [your-email] tag, 3: [your-subject] tag, 4: [your-message] tag. */
+				__( "From: %1\$s <%2\$s>\nSubject: %3\$s\n\nMessage:\n%4\$s", 'oli-contact-form' ),
+				'[your-name]',
+				'[your-email]',
+				'[your-subject]',
+				'[your-message]'
+			),
 			'reply_to'           => '[your-email]',
 			'additional_headers' => '',
 		);
@@ -79,8 +86,8 @@ class Oli_CF_Mailer {
 			'enabled'            => false,
 			'to'                 => '[your-email]',
 			'from'               => (string) get_option( 'admin_email' ),
-			'subject'            => 'Thank you for your message',
-			'body'               => "Thank you for contacting us.\n\nWe will get back to you soon.",
+			'subject'            => __( 'Thank you for your message', 'oli-contact-form' ),
+			'body'               => __( "Thank you for contacting us.\n\nWe will get back to you soon.", 'oli-contact-form' ),
 			'reply_to'           => '',
 			'additional_headers' => '',
 		);

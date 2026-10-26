@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.5
+Stable tag: 0.3.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -126,10 +126,13 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 3. Form displayed on the frontend
 4. Gutenberg block settings
 5. CF7 importer
-6. Success message after a submission.
-7. Validation errors: required field and invalid email address.
+6. Success message after a submission
+7. Validation errors: required field and invalid email address
 
 == Changelog ==
+
+= 0.3.6 =
+* Translation fixes: block editor script translations, translatable default emails, regenerated POT.
 
 = 0.3.5 =
 * Merge stored _oli_cf_mail / _oli_cf_mail_2 with defaults (wp_parse_args) so a migrated meta without reply_to does not warn on the form editor. The mailer does the same before send.
@@ -190,6 +193,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.6 =
+Translation fixes: block editor script translations, translatable default emails, regenerated POT.
 
 = 0.3.5 =
 Form editor no longer warns when notification mail meta is missing reply_to (programmatic or migrated forms).

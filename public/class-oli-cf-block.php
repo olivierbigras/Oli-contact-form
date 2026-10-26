@@ -30,6 +30,8 @@ class Oli_CF_Block {
 			true
 		);
 
+		wp_set_script_translations( 'oli-cf-block-editor', 'oli-contact-form', OLI_CF_PLUGIN_DIR . 'languages' );
+
 		wp_localize_script(
 			'oli-cf-block-editor',
 			'oliCfBlock',

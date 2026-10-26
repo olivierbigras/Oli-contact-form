@@ -5,6 +5,13 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2026-10-26
+
+### Fixed
+- Chargement des traductions du script de l’éditeur de bloc (`wp_set_script_translations` sur `oli-cf-block-editor`).
+- Sujets, corps et libellés (From / Subject / Message) des courriels par défaut désormais traduisibles. Les valeurs déjà enregistrées dans les options ou métas restent inchangées.
+- En-tête `Domain Path: /languages` et fichier POT régénéré (y compris les chaînes JS du bloc).
+
 ## [0.3.5] - 2026-10-26
 
 ### Fixed
