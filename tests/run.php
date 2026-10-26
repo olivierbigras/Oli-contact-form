@@ -26,6 +26,23 @@ foreach ( $tests as $test ) {
 	}
 }
 
+$node = '';
+
+if ( function_exists( 'shell_exec' ) ) {
+	$found = shell_exec( 'command -v node 2>/dev/null' );
+	$node  = is_string( $found ) ? trim( $found ) : '';
+}
+
+if ( '' !== $node ) {
+	echo "=== test-public-js.js ===\n";
+	passthru( escapeshellarg( $node ) . ' ' . escapeshellarg( __DIR__ . '/test-public-js.js' ), $code );
+	echo "\n";
+
+	if ( 0 !== (int) $code ) {
+		++$failed;
+	}
+}
+
 if ( $failed > 0 ) {
 	fwrite( STDERR, "{$failed} test file(s) failed.\n" );
 	exit( 1 );

@@ -133,6 +133,9 @@ class Oli_CF_Public {
 				'strings'          => array(
 					'validationError' => __( 'One or more fields have an error. Please check and try again.', 'oli-contact-form' ),
 					'unexpectedError' => __( 'An unexpected error occurred. Please try again.', 'oli-contact-form' ),
+					'errorBannerOne'  => __( 'The form contains 1 error.', 'oli-contact-form' ),
+					/* translators: %d: number of invalid fields */
+					'errorBannerMany' => __( 'The form contains %d errors.', 'oli-contact-form' ),
 					/* translators: %d: number of invalid fields */
 					'errorBanner'     => __( 'The form contains %d errors.', 'oli-contact-form' ),
 					'invalidRequired' => __( 'This field is required.', 'oli-contact-form' ),

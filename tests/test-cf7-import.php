@@ -131,6 +131,41 @@ $accept_html = Oli_CF_Form_Parser::parse( '[acceptance consent] J\'accepte d\'ê
 oli_cf_assert_true( false !== strpos( $accept_html, 'J\'accepte d\'être contacté.' ), 'paired acceptance text is the checkbox label' );
 oli_cf_assert_same( false, strpos( $accept_html, 'I accept the terms' ), 'default acceptance label is not used when text is provided' );
 
+$plain_accept = Oli_CF_Form_Parser::parse_tag( 'acceptance your-consent' );
+oli_cf_assert_true( ! empty( $plain_accept['required'] ), 'CF7 acceptance without asterisk is required' );
+
+$star_accept = Oli_CF_Form_Parser::parse_tag( 'acceptance* your-consent' );
+oli_cf_assert_true( ! empty( $star_accept['required'] ), 'CF7 acceptance* is required' );
+
+$optional_accept = Oli_CF_Form_Parser::parse_tag( 'acceptance your-consent optional "I agree"' );
+oli_cf_assert_false( ! empty( $optional_accept['required'] ), 'CF7 acceptance is optional only with the optional option' );
+oli_cf_assert_false( in_array( 'optional', $optional_accept['values'], true ), 'optional is not part of the acceptance label' );
+
+$quoted_optional = Oli_CF_Form_Parser::parse_tag( 'acceptance your-consent "optional"' );
+oli_cf_assert_true( ! empty( $quoted_optional['required'] ), 'quoted optional stays a label, field remains required' );
+
+$imported_plain = Oli_CF_Importer::convert_template( '[acceptance your-consent] I agree to the privacy policy. [/acceptance]' );
+$imported_plain_fields = Oli_CF_Form_Parser::parse_fields( $imported_plain );
+oli_cf_assert_true( isset( $imported_plain_fields[0]['required'] ) && $imported_plain_fields[0]['required'], 'imported CF7 [acceptance] without asterisk is required' );
+
+$imported_plain_html = Oli_CF_Form_Parser::parse( $imported_plain, 3 );
+oli_cf_assert_true( false !== strpos( $imported_plain_html, 'required="required"' ), 'imported required acceptance renders required' );
+oli_cf_assert_true( false !== strpos( $imported_plain_html, 'aria-required="true"' ), 'imported required acceptance is aria-required' );
+
+$imported_optional = Oli_CF_Importer::convert_template( '[acceptance your-consent optional] I agree [/acceptance]' );
+oli_cf_assert_true( false !== strpos( $imported_optional, ' optional' ), 'imported CF7 optional option is kept unquoted' );
+$imported_optional_fields = Oli_CF_Form_Parser::parse_fields( $imported_optional );
+oli_cf_assert_false( ! empty( $imported_optional_fields[0]['required'] ), 'imported CF7 acceptance with optional stays optional' );
+
+$imported_optional_html = Oli_CF_Form_Parser::parse( $imported_optional, 4 );
+oli_cf_assert_same( false, strpos( $imported_optional_html, 'required="required"' ), 'optional imported acceptance is not required in HTML' );
+
+$missing_plain = Oli_CF_Validator::validate( array(), '[acceptance your-consent "I agree"]', array() );
+oli_cf_assert_true( is_array( $missing_plain ) && isset( $missing_plain['your-consent'] ), 'unchecked imported acceptance fails validation' );
+
+$missing_optional = Oli_CF_Validator::validate( array(), '[acceptance your-consent optional "I agree"]', array() );
+oli_cf_assert_same( true, $missing_optional, 'unchecked optional acceptance passes validation' );
+
 if ( $oli_cf_failures > 0 ) {
 	fwrite( STDERR, "\n{$oli_cf_failures} CF7 import test(s) failed.\n" );
 	exit( 1 );

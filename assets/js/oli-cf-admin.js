@@ -63,7 +63,7 @@
 					if (!acceptLabel) {
 						return null;
 					}
-					tag = '[acceptance' + requiredMark + ' ' + name + ' "' + acceptLabel + '"]';
+					tag = '[acceptance' + requiredMark + ' ' + name + (required ? '' : ' optional') + ' "' + acceptLabel + '"]';
 					break;
 
 				case 'file':

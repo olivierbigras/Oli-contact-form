@@ -15,6 +15,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Oli_CF_Submission {
 
 	/**
+	 * Transient prefix for no-JS validation/mail feedback.
+	 */
+	const FEEDBACK_TRANSIENT_PREFIX = 'oli_cf_fb_';
+
+	/**
+	 * How long the no-JS feedback transient lives, in seconds.
+	 */
+	const FEEDBACK_TTL = 300;
+
+	/**
 	 * Handle AJAX form submission.
 	 */
 	public function handle_ajax_submission() {
@@ -69,19 +79,135 @@ class Oli_CF_Submission {
 
 		$posted       = wp_unslash( $_POST );
 		$redirect_url = self::resolve_redirect_url( $form_id, is_array( $posted ) ? $posted : array() );
+		$status       = self::normalize_status( $result );
 
 		$status_args = array(
 			'oli_cf_status_nonce' => wp_create_nonce( 'oli_cf_status_' . $form_id ),
+			'oli_cf_status'       => $status,
 		);
 
 		if ( $result['success'] ) {
 			$status_args['oli_cf_success'] = $form_id;
 		} else {
 			$status_args['oli_cf_error'] = $form_id;
+			$token                       = self::store_feedback( $form_id, $result );
+
+			if ( '' !== $token ) {
+				$status_args['oli_cf_token'] = $token;
+			}
 		}
 
 		wp_safe_redirect( add_query_arg( $status_args, $redirect_url ) );
 		exit;
+	}
+
+	/**
+	 * Status string stored in the redirect and the feedback transient.
+	 *
+	 * @param array<string, mixed> $result process_submission() result.
+	 * @return string
+	 */
+	public static function normalize_status( $result ) {
+		if ( ! is_array( $result ) ) {
+			return 'mail_failed';
+		}
+
+		if ( ! empty( $result['success'] ) ) {
+			return 'success';
+		}
+
+		$status = isset( $result['status'] ) ? sanitize_key( (string) $result['status'] ) : '';
+
+		if ( in_array( $status, array( 'validation', 'mail_failed', 'spam' ), true ) ) {
+			return $status;
+		}
+
+		return 'mail_failed';
+	}
+
+	/**
+	 * Store sanitized no-JS feedback (errors + values). The URL only gets a token.
+	 *
+	 * @param int                  $form_id Form ID.
+	 * @param array<string, mixed> $result  process_submission() result.
+	 * @return string Token, or empty string on failure.
+	 */
+	public static function store_feedback( $form_id, $result ) {
+		$form_id = absint( $form_id );
+
+		if ( ! $form_id || ! is_array( $result ) ) {
+			return '';
+		}
+
+		$token = function_exists( 'wp_generate_password' ) ? wp_generate_password( 24, false, false ) : bin2hex( random_bytes( 12 ) );
+		$token = preg_replace( '/[^A-Za-z0-9]/', '', (string) $token );
+
+		if ( ! is_string( $token ) || strlen( $token ) < 12 ) {
+			return '';
+		}
+
+		$errors = array();
+
+		if ( isset( $result['errors'] ) && is_array( $result['errors'] ) ) {
+			foreach ( $result['errors'] as $field => $message ) {
+				if ( ! is_string( $field ) || '' === $field || ! is_string( $message ) ) {
+					continue;
+				}
+
+				$errors[ $field ] = sanitize_text_field( $message );
+			}
+		}
+
+		$values = array();
+
+		if ( isset( $result['values'] ) && is_array( $result['values'] ) ) {
+			$values = $result['values'];
+		}
+
+		$payload = array(
+			'form_id' => $form_id,
+			'status'  => self::normalize_status( $result ),
+			'message' => isset( $result['message'] ) ? sanitize_text_field( (string) $result['message'] ) : '',
+			'errors'  => $errors,
+			'values'  => $values,
+		);
+
+		if ( ! set_transient( self::FEEDBACK_TRANSIENT_PREFIX . $token, $payload, self::FEEDBACK_TTL ) ) {
+			return '';
+		}
+
+		return $token;
+	}
+
+	/**
+	 * Read and delete a one-shot no-JS feedback payload.
+	 *
+	 * @param string $token   Token from the redirect query string.
+	 * @param int    $form_id Expected form ID.
+	 * @return array<string, mixed>
+	 */
+	public static function consume_feedback( $token, $form_id ) {
+		$token   = preg_replace( '/[^A-Za-z0-9]/', '', (string) $token );
+		$form_id = absint( $form_id );
+
+		if ( ! is_string( $token ) || '' === $token || ! $form_id ) {
+			return array();
+		}
+
+		$key     = self::FEEDBACK_TRANSIENT_PREFIX . $token;
+		$payload = get_transient( $key );
+
+		if ( ! is_array( $payload ) ) {
+			return array();
+		}
+
+		if ( ! isset( $payload['form_id'] ) || absint( $payload['form_id'] ) !== $form_id ) {
+			return array();
+		}
+
+		delete_transient( $key );
+
+		return $payload;
 	}
 
 	/**
@@ -149,6 +275,7 @@ class Oli_CF_Submission {
 		if ( ! $form || 'oli_contact_form' !== $form->post_type ) {
 			return array(
 				'success' => false,
+				'status'  => 'mail_failed',
 				'message' => __( 'Form not found.', 'oli-contact-form' ),
 			);
 		}
@@ -159,6 +286,7 @@ class Oli_CF_Submission {
 		if ( empty( $template ) ) {
 			return array(
 				'success' => false,
+				'status'  => 'mail_failed',
 				'message' => __( 'Form configuration error.', 'oli-contact-form' ),
 			);
 		}
@@ -180,7 +308,9 @@ class Oli_CF_Submission {
 		if ( is_array( $spam_check ) ) {
 			return array(
 				'success' => false,
+				'status'  => 'spam',
 				'message' => $spam_check['message'],
+				'values'  => $data,
 			);
 		}
 
@@ -189,8 +319,10 @@ class Oli_CF_Submission {
 		if ( is_array( $validation ) ) {
 			return array(
 				'success' => false,
+				'status'  => 'validation',
 				'message' => $messages['validation_error'],
 				'errors'  => $validation,
+				'values'  => $data,
 			);
 		}
 
@@ -212,7 +344,9 @@ class Oli_CF_Submission {
 		if ( ! $sent ) {
 			return array(
 				'success' => false,
+				'status'  => 'mail_failed',
 				'message' => $messages['mail_sent_ng'],
+				'values'  => $data,
 			);
 		}
 
@@ -226,6 +360,7 @@ class Oli_CF_Submission {
 
 		return array(
 			'success' => true,
+			'status'  => 'success',
 			'message' => $messages['mail_sent_ok'],
 		);
 	}
@@ -250,6 +385,12 @@ class Oli_CF_Submission {
 			'oli_cf_redirect',
 			'_wpnonce',
 			'_wp_http_referer',
+			'oli_cf_submit',
+			'oli_cf_form_id',
+			'form_id',
+			'oli_cf_hp',
+			'g-recaptcha-response',
+			'cf-turnstile-response',
 		);
 
 		foreach ( $post as $key => $value ) {

@@ -141,17 +141,52 @@ class Oli_CF_Shortcode {
 
 		$success_message = '';
 		$error_message   = '';
+		$field_state     = array(
+			'values' => array(),
+			'errors' => array(),
+		);
 		$status_nonce    = isset( $_GET['oli_cf_status_nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['oli_cf_status_nonce'] ) ) : '';
+		$status_query    = isset( $_GET['oli_cf_status'] ) ? sanitize_key( wp_unslash( $_GET['oli_cf_status'] ) ) : '';
+		$feedback_token  = isset( $_GET['oli_cf_token'] ) ? sanitize_text_field( wp_unslash( $_GET['oli_cf_token'] ) ) : '';
 
 		if ( wp_verify_nonce( $status_nonce, 'oli_cf_status_' . $form_id ) ) {
-			$messages = Oli_CF_Validator::normalize_messages( get_post_meta( $form_id, '_oli_cf_messages', true ) );
+			$messages   = Oli_CF_Validator::normalize_messages( get_post_meta( $form_id, '_oli_cf_messages', true ) );
+			$success_id = isset( $_GET['oli_cf_success'] ) ? absint( wp_unslash( $_GET['oli_cf_success'] ) ) : 0;
+			$error_id   = isset( $_GET['oli_cf_error'] ) ? absint( wp_unslash( $_GET['oli_cf_error'] ) ) : 0;
 
-			if ( isset( $_GET['oli_cf_success'] ) && absint( wp_unslash( $_GET['oli_cf_success'] ) ) === $form_id ) {
+			if ( $success_id === $form_id || 'success' === $status_query ) {
 				$success_message = $messages['mail_sent_ok'];
 			}
 
-			if ( isset( $_GET['oli_cf_error'] ) && absint( wp_unslash( $_GET['oli_cf_error'] ) ) === $form_id ) {
-				$error_message = $messages['mail_sent_ng'];
+			if ( $error_id === $form_id || in_array( $status_query, array( 'validation', 'mail_failed', 'spam' ), true ) ) {
+				$feedback = Oli_CF_Submission::consume_feedback( $feedback_token, $form_id );
+
+				if ( ! empty( $feedback ) ) {
+					$field_state['errors'] = isset( $feedback['errors'] ) && is_array( $feedback['errors'] ) ? $feedback['errors'] : array();
+					$field_state['values'] = isset( $feedback['values'] ) && is_array( $feedback['values'] ) ? $feedback['values'] : array();
+					$error_message         = isset( $feedback['message'] ) ? (string) $feedback['message'] : '';
+					$feedback_status       = isset( $feedback['status'] ) ? (string) $feedback['status'] : $status_query;
+
+					if ( 'validation' === $feedback_status ) {
+						$count = count( $field_state['errors'] );
+
+						if ( $count > 0 ) {
+							$error_message = sprintf(
+								/* translators: %d: number of invalid fields */
+								_n( 'The form contains %d error.', 'The form contains %d errors.', $count, 'oli-contact-form' ),
+								$count
+							);
+						} elseif ( '' === $error_message ) {
+							$error_message = $messages['validation_error'];
+						}
+					} elseif ( '' === $error_message ) {
+						$error_message = $messages['mail_sent_ng'];
+					}
+				} elseif ( 'validation' === $status_query ) {
+					$error_message = $messages['validation_error'];
+				} else {
+					$error_message = $messages['mail_sent_ng'];
+				}
 			}
 		}
 
@@ -168,13 +203,22 @@ class Oli_CF_Shortcode {
 
 		ob_start();
 		?>
-		<div class="oli-cf-container<?php echo $has_status ? ' oli-cf-has-status' : ''; ?>" id="oli-cf-container-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" tabindex="-1">
-			<div class="oli-cf-response-output" aria-live="polite" role="<?php echo $error_message ? 'alert' : 'status'; ?>">
+		<div class="oli-cf-container<?php echo $has_status ? ' oli-cf-has-status' : ''; ?>" id="oli-cf-container-<?php echo esc_attr( (string) absint( $form_id ) ); ?>">
+			<div class="oli-cf-response-output" tabindex="-1" aria-live="polite" role="<?php echo $error_message ? 'alert' : 'status'; ?>">
 				<?php if ( $success_message ) : ?>
 					<div class="oli-cf-response-success"><?php echo esc_html( $success_message ); ?></div>
 				<?php endif; ?>
 				<?php if ( $error_message ) : ?>
-					<div class="oli-cf-response-error"><?php echo esc_html( $error_message ); ?></div>
+					<div class="oli-cf-response-error">
+						<?php echo esc_html( $error_message ); ?>
+						<?php if ( ! empty( $field_state['errors'] ) ) : ?>
+							<ul class="oli-cf-validation-errors">
+								<?php foreach ( $field_state['errors'] as $error_field => $error_text ) : ?>
+									<li><a href="#oli-cf-<?php echo esc_attr( (string) absint( $form_id ) ); ?>-<?php echo esc_attr( sanitize_key( (string) $error_field ) ); ?>"><?php echo esc_html( (string) $error_text ); ?></a></li>
+								<?php endforeach; ?>
+							</ul>
+						<?php endif; ?>
+					</div>
 				<?php endif; ?>
 			</div>
 
@@ -193,7 +237,7 @@ class Oli_CF_Shortcode {
 					<input type="text" name="oli_cf_hp" id="oli-cf-hp-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" value="" tabindex="-1" autocomplete="off" />
 				</div>
 
-				<?php echo Oli_CF_Form_Parser::parse( $template, $form_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- parse() runs wp_kses(). ?>
+				<?php echo Oli_CF_Form_Parser::parse( $template, $form_id, $field_state ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- parse() runs wp_kses(). ?>
 
 				<?php echo Oli_CF_Public::recaptcha_widget_html( $form_id, $settings ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes attributes. ?>
 

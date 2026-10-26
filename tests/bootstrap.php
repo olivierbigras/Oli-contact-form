@@ -471,6 +471,69 @@ if ( ! function_exists( 'get_temp_dir' ) ) {
 	}
 }
 
+if ( ! function_exists( '_n' ) ) {
+	/**
+	 * @param string $single Single.
+	 * @param string $plural Plural.
+	 * @param int    $number Number.
+	 * @return string
+	 */
+	function _n( $single, $plural, $number, $domain = null ) {
+		unset( $domain );
+		return ( 1 === (int) $number ) ? $single : $plural;
+	}
+}
+
+if ( ! function_exists( 'set_transient' ) ) {
+	/**
+	 * @param string $key   Key.
+	 * @param mixed  $value Value.
+	 * @param int    $ttl   TTL.
+	 * @return bool
+	 */
+	function set_transient( $key, $value, $ttl = 0 ) {
+		if ( ! isset( $GLOBALS['oli_cf_test_transients'] ) || ! is_array( $GLOBALS['oli_cf_test_transients'] ) ) {
+			$GLOBALS['oli_cf_test_transients'] = array();
+		}
+
+		$GLOBALS['oli_cf_test_transients'][ (string) $key ] = array(
+			'value' => $value,
+			'ttl'   => (int) $ttl,
+		);
+
+		return true;
+	}
+}
+
+if ( ! function_exists( 'get_transient' ) ) {
+	/**
+	 * @param string $key Key.
+	 * @return mixed
+	 */
+	function get_transient( $key ) {
+		if ( ! isset( $GLOBALS['oli_cf_test_transients'][ (string) $key ] ) ) {
+			return false;
+		}
+
+		return $GLOBALS['oli_cf_test_transients'][ (string) $key ]['value'];
+	}
+}
+
+if ( ! function_exists( 'delete_transient' ) ) {
+	/**
+	 * @param string $key Key.
+	 * @return bool
+	 */
+	function delete_transient( $key ) {
+		if ( isset( $GLOBALS['oli_cf_test_transients'][ (string) $key ] ) ) {
+			unset( $GLOBALS['oli_cf_test_transients'][ (string) $key ] );
+			return true;
+		}
+
+		return false;
+	}
+}
+
 if ( ! function_exists( 'wp_generate_password' ) ) {
 	/**
 	 * @param int  $length              Length.

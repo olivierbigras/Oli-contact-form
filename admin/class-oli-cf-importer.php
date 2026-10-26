@@ -291,6 +291,11 @@ class Oli_CF_Importer {
 				continue;
 			}
 
+			if ( 'optional' === strtolower( $token ) ) {
+				$out[] = 'optional';
+				continue;
+			}
+
 			if ( preg_match( '/^([a-z0-9_-]+):(.*)$/i', $token, $attr ) ) {
 				$key = strtolower( $attr[1] );
 				$val = $attr[2];

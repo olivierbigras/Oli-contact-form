@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.2
+Stable tag: 0.3.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -129,6 +129,14 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 == Changelog ==
 
+= 0.3.3 =
+* AJAX success and error banners show again: handleAjaxResponse now binds `this` instead of window.self.
+* The submit button and spinner reset after success, validation errors, and network failures.
+* No-JS validation is distinguished from a send failure (oli_cf_status=validation|mail_failed). Field values and errors come back via a 5-minute token transient, not the URL.
+* JS error summary names the field and uses singular/plural copy.
+* Status banner (.oli-cf-response-output) is focusable (tabindex="-1") after a no-JS return.
+* Imported CF7 [acceptance] is required by default (with or without *); optional only when the CF7 optional option is present.
+
 = 0.3.2 =
 * reCAPTCHA version is a setting (v2 checkbox or v3 execute). Do not guess the version from the key.
 * v3 siteverify responses without a score are rejected. v2 still accepts success:true.
@@ -172,6 +180,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.3 =
+Fixes the AJAX banner crash (self is undefined). Imported CF7 acceptance fields are required unless they use the optional option.
 
 = 0.3.2 =
 Choose reCAPTCHA v2 or v3 in Settings. AJAX success is shown correctly. Imported CF7 file and acceptance fields keep their options and labels.

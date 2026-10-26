@@ -322,7 +322,7 @@ class Oli_CF_Meta_Boxes {
 			'    [text* your-subject] </label>' . "\n\n" .
 			'<label> ' . __( 'Your message', 'oli-contact-form' ) . "\n" .
 			'    [textarea your-message] </label>' . "\n\n" .
-			'[acceptance consent "' . __( 'I consent to being contacted about this inquiry.', 'oli-contact-form' ) . '"]' . "\n\n" .
+			'[acceptance consent optional "' . __( 'I consent to being contacted about this inquiry.', 'oli-contact-form' ) . '"]' . "\n\n" .
 			'[submit "' . __( 'Send', 'oli-contact-form' ) . '"]';
 	}
 

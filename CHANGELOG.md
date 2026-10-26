@@ -5,6 +5,15 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-10-26
+
+### Fixed
+- AJAX `handleAjaxResponse()` used `self` without binding it (`window.self`), so success and error banners never appeared and the submit button stayed disabled with a spinner. The handler now uses `var self = this` and `resetSubmit()` on success, error, and network failure (`complete`).
+- No-JS validation was shown as a generic send error. Redirects now set `oli_cf_status=validation` or `mail_failed` and replay sanitized values plus per-field errors from a 5-minute token transient (no PII in the URL).
+- JS error summary names the field (`Label : message`) and uses singular/plural strings.
+- `.oli-cf-response-output` has `tabindex="-1"` and receives focus after a no-JS return.
+- Imported CF7 `[acceptance]` is required by default, like CF7, with or without `*`. It is optional only when the CF7 `optional` option is present. The plugin default form still uses `[acceptance … optional]`.
+
 ## [0.3.2] - 2026-10-26
 
 ### Added

@@ -14,6 +14,46 @@
 		return String($field.attr('name') || '').replace(/\[\]$/, '');
 	}
 
+	function fieldLabel($field) {
+		var $itemLabel = $field.closest('.oli-cf-list-item').find('.oli-cf-list-item-label').first();
+		if ($itemLabel.length) {
+			var item = $itemLabel.text().replace(/\s+/g, ' ').trim();
+			if (item) {
+				return item;
+			}
+		}
+
+		var $wrapLabel = $field.closest('label');
+		if ($wrapLabel.length) {
+			var clone = $wrapLabel.clone();
+			clone.find('input, textarea, select, .oli-cf-required, .oli-cf-field-error, .oli-cf-list-item-label').remove();
+			var text = clone.text().replace(/\s+/g, ' ').replace(/\*/g, '').trim();
+			if (text) {
+				return text;
+			}
+		}
+
+		var id = $field.attr('id');
+		if (id) {
+			var $forLabel = $field.closest('form, .oli-cf-form').find('label[for="' + id + '"]').first();
+			if ($forLabel.length) {
+				var forClone = $forLabel.clone();
+				forClone.find('input, textarea, select, .oli-cf-required, .oli-cf-field-error').remove();
+				var forText = forClone.text().replace(/\s+/g, ' ').replace(/\*/g, '').trim();
+				if (forText) {
+					return forText;
+				}
+			}
+		}
+
+		var placeholder = $field.attr('placeholder');
+		if (placeholder) {
+			return placeholder;
+		}
+
+		return fieldName($field);
+	}
+
 	function formMessages($form) {
 		var defaults = (window.oliCf && oliCf.strings) ? oliCf.strings : {};
 		var encoded = $form.attr('data-oli-messages');
@@ -42,9 +82,9 @@
 	var OliContactForm = {
 		init: function() {
 			this.bindEvents();
-			var $status = $('.oli-cf-container.oli-cf-has-status');
-			if ($status.length) {
-				$status.attr('tabindex', '-1').trigger('focus');
+			var $output = $('.oli-cf-container.oli-cf-has-status .oli-cf-response-output');
+			if ($output.length) {
+				this.focusStatus($output.first());
 			}
 		},
 
@@ -59,6 +99,22 @@
 			$(document).on('blur', '.oli-cf-field', function() {
 				self.validateField($(this), formMessages($(this).closest('.oli-cf-form')));
 			});
+		},
+
+		resetSubmit: function($submit) {
+			if (!$submit || !$submit.length) {
+				return;
+			}
+
+			$submit.prop('disabled', false).find('.oli-cf-spinner').remove();
+		},
+
+		focusStatus: function($output) {
+			if (!$output || !$output.length) {
+				return;
+			}
+
+			$output.attr('tabindex', '-1').trigger('focus');
 		},
 
 		handleSubmit: function($form) {
@@ -81,7 +137,9 @@
 			});
 
 			if (!isValid) {
+				self.resetSubmit($submit);
 				self.showBanner($form, $output, messages.validation_error, true);
+				self.focusStatus($output);
 				$form.find('[aria-invalid="true"]').first().trigger('focus');
 				return false;
 			}
@@ -96,8 +154,9 @@
 						$form.find('#oli-cf-recaptcha-' + formId).val(token);
 						self.submitForm($form, $container, $output, $submit);
 					}).catch(function() {
-						$submit.prop('disabled', false).find('.oli-cf-spinner').remove();
+						self.resetSubmit($submit);
 						self.showBanner($form, $output, strings.unexpectedError || 'An unexpected error occurred. Please try again.', true);
+						self.focusStatus($output);
 					});
 				});
 			} else {
@@ -141,39 +200,63 @@
 						return;
 					}
 
-					$submit.prop('disabled', false).find('.oli-cf-spinner').remove();
+					self.resetSubmit($submit);
 					self.showBanner($form, $output, strings.unexpectedError || 'An unexpected error occurred. Please try again.', true);
+					self.focusStatus($output);
+				},
+				complete: function() {
+					self.resetSubmit($submit);
 				}
 			});
 		},
 
 		handleAjaxResponse: function($form, $container, $output, $submit, response, strings, messages) {
-			$submit.prop('disabled', false).find('.oli-cf-spinner').remove();
+			var self = this;
+			self.resetSubmit($submit);
 
-			if (response && response.success) {
-				var ok = response.data && response.data.message ? response.data.message : messages.validation_error;
-				self.showBanner($form, $output, ok, false);
-				$form[0].reset();
-				$form.find('.oli-cf-field').removeClass('oli-cf-invalid').attr('aria-invalid', 'false').removeAttr('aria-describedby');
-				$form.find('.oli-cf-field-error').remove();
-			} else {
-				var failMessage = response && response.data && response.data.message ? response.data.message : strings.unexpectedError;
-				self.showBanner($form, $output, failMessage, true);
+			try {
+				if (response && response.success) {
+					var ok = response.data && response.data.message ? response.data.message : (strings.unexpectedError || '');
+					self.showBanner($form, $output, ok, false);
+					if ($form[0] && typeof $form[0].reset === 'function') {
+						$form[0].reset();
+					}
+					$form.find('.oli-cf-field').removeClass('oli-cf-invalid').attr('aria-invalid', 'false').removeAttr('aria-describedby');
+					$form.find('.oli-cf-field-error').remove();
+					self.focusStatus($output);
+				} else {
+					var failMessage = response && response.data && response.data.message ? response.data.message : (strings.unexpectedError || 'An unexpected error occurred. Please try again.');
 
-				if (response && response.data && response.data.errors) {
-					$.each(response.data.errors, function(field, error) {
-						var $field = $form.find('[name="' + field + '"], [name="' + field + '[]"]').filter('.oli-cf-field').first();
-						if ($field.length) {
-							self.showFieldError($field, error);
-						}
-					});
-					$form.find('[aria-invalid="true"]').first().trigger('focus');
+					if (response && response.data && response.data.errors) {
+						$.each(response.data.errors, function(field, error) {
+							var $field = $form.find('[name="' + field + '"], [name="' + field + '[]"]').filter('.oli-cf-field').first();
+							if ($field.length) {
+								self.showFieldError($field, error);
+							}
+						});
+					}
+
+					self.showBanner($form, $output, failMessage, true);
+
+					var $invalid = $form.find('[aria-invalid="true"]');
+					if ($invalid.length) {
+						$invalid.first().trigger('focus');
+					} else {
+						self.focusStatus($output);
+					}
 				}
-			}
 
-			$('html, body').animate({
-				scrollTop: $container.offset().top - 50
-			}, 300);
+				if ($container && $container.length && typeof $container.offset === 'function') {
+					var offset = $container.offset();
+					if (offset && typeof offset.top === 'number') {
+						$('html, body').animate({
+							scrollTop: offset.top - 50
+						}, 300);
+					}
+				}
+			} finally {
+				self.resetSubmit($submit);
+			}
 		},
 
 		showBanner: function($form, $output, message, isError) {
@@ -186,17 +269,22 @@
 			if (isError) {
 				var $invalid = $form.find('[aria-invalid="true"]');
 				if ($invalid.length) {
-					var banner = (strings.errorBanner || 'The form contains %d errors.').replace('%d', $invalid.length);
+					var count = $invalid.length;
+					var banner = count === 1
+						? (strings.errorBannerOne || 'The form contains 1 error.')
+						: (strings.errorBannerMany || strings.errorBanner || 'The form contains %d errors.').replace('%d', count);
 					html = '<div class="oli-cf-response-error">' + escapeHtml(banner) + '<ul class="oli-cf-validation-errors">';
 					$invalid.each(function() {
 						var $field = $(this);
 						var id = $field.attr('id') || '';
 						var err = $field.closest('.oli-cf-form-control-wrap').find('.oli-cf-field-error').text();
+						var label = fieldLabel($field);
+						var item = label ? (label + ' : ' + err) : err;
 						html += '<li>';
 						if (id) {
-							html += '<a href="#' + escapeHtml(id) + '">' + escapeHtml(err) + '</a>';
+							html += '<a href="#' + escapeHtml(id) + '">' + escapeHtml(item) + '</a>';
 						} else {
-							html += escapeHtml(err);
+							html += escapeHtml(item);
 						}
 						html += '</li>';
 					});

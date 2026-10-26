@@ -22,13 +22,23 @@ class Oli_CF_Form_Parser {
 	const INPUT_TYPES = array( 'text', 'email', 'tel', 'phone', 'url', 'number', 'date' );
 
 	/**
+	 * Render-time posted values and field errors (no-JS return).
+	 *
+	 * @var array<string, mixed>
+	 */
+	private static $render_state = array();
+
+	/**
 	 * Parse form template and return HTML.
 	 *
-	 * @param string $template Form template with CF7-like tags.
-	 * @param int    $form_id  Form ID.
+	 * @param string               $template Form template with CF7-like tags.
+	 * @param int                  $form_id  Form ID.
+	 * @param array<string, mixed> $state    Optional values/errors to replay after a no-JS submit.
 	 * @return string Parsed HTML.
 	 */
-	public static function parse( $template, $form_id ) {
+	public static function parse( $template, $form_id, $state = array() ) {
+		self::$render_state = is_array( $state ) ? $state : array();
+
 		$html = self::normalize_template( $template );
 
 		$html = preg_replace_callback(
@@ -40,6 +50,8 @@ class Oli_CF_Form_Parser {
 		);
 
 		$html = self::inject_required_marks( (string) $html );
+
+		self::$render_state = array();
 
 		return self::kses( (string) $html );
 	}
@@ -104,6 +116,7 @@ class Oli_CF_Form_Parser {
 		$name       = '';
 		$attributes = array();
 		$values     = array();
+		$optional   = self::tag_has_bare_option( $tag, 'optional' );
 
 		if ( 'submit' !== $type && ! empty( $tokens ) && false === strpos( $tokens[0], ':' ) ) {
 			$name = array_shift( $tokens );
@@ -115,7 +128,15 @@ class Oli_CF_Form_Parser {
 				continue;
 			}
 
+			if ( 'acceptance' === $type && 'optional' === strtolower( $token ) && $optional ) {
+				continue;
+			}
+
 			$values[] = $token;
+		}
+
+		if ( 'acceptance' === $type ) {
+			$required = ! $optional;
 		}
 
 		return array(
@@ -125,6 +146,29 @@ class Oli_CF_Form_Parser {
 			'attributes' => $attributes,
 			'values'     => $values,
 		);
+	}
+
+	/**
+	 * Whether a tag has an unquoted option such as CF7 `optional`.
+	 *
+	 * @param string $tag    Tag content without brackets.
+	 * @param string $option Option name.
+	 * @return bool
+	 */
+	public static function tag_has_bare_option( $tag, $option ) {
+		$option = strtolower( (string) $option );
+
+		if ( '' === $option ) {
+			return false;
+		}
+
+		$bare = preg_replace( '/"[^"]*"|\'[^\']*\'/', '', (string) $tag );
+
+		if ( ! is_string( $bare ) ) {
+			return false;
+		}
+
+		return (bool) preg_match( '/(?:^|[\s])' . preg_quote( $option, '/' ) . '(?:[\s]|$)/i', $bare );
 	}
 
 	/**
@@ -232,6 +276,7 @@ class Oli_CF_Form_Parser {
 					'data-filetypes'  => true,
 					'autocomplete'    => true,
 					'tabindex'        => true,
+					'checked'         => true,
 				)
 			),
 			'textarea' => array_merge(
@@ -406,23 +451,28 @@ class Oli_CF_Form_Parser {
 	private static function render_input_field( $type, $name, $required, $attrs, $form_id ) {
 		$html_type = ( 'tel' === $type ) ? 'tel' : $type;
 		$id        = self::field_id( $form_id, $name );
-		$class     = self::field_class( $html_type, $required );
+		$error     = self::state_error( $name );
+		$class     = self::field_class( $html_type, $required, '' !== $error );
 
 		$placeholder = isset( $attrs['placeholder'] ) ? $attrs['placeholder'] : '';
 		$default     = isset( $attrs['default'] ) ? $attrs['default'] : '';
+		$posted      = self::state_value( $name );
+		$value       = ( null !== $posted && ! is_array( $posted ) ) ? (string) $posted : $default;
 
 		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
-			'<input type="%s" name="%s" id="%s" class="%s" value="%s"%s%s%s aria-invalid="false" />',
+			'<input type="%s" name="%s" id="%s" class="%s" value="%s"%s%s%s%s />',
 			esc_attr( $html_type ),
 			esc_attr( $name ),
 			esc_attr( $id ),
 			esc_attr( $class ),
-			esc_attr( $default ),
+			esc_attr( $value ),
 			$required ? ' required="required" aria-required="true"' : '',
 			'' !== $placeholder ? ' placeholder="' . esc_attr( $placeholder ) . '"' : '',
-			self::length_attributes( $attrs )
+			self::length_attributes( $attrs ),
+			self::invalid_attrs( $name, $error )
 		);
+		$html .= self::field_error_html( $name, $error );
 		$html .= '</span>';
 
 		return $html;
@@ -439,10 +489,13 @@ class Oli_CF_Form_Parser {
 	 */
 	private static function render_textarea( $name, $required, $attrs, $form_id ) {
 		$id    = self::field_id( $form_id, $name );
-		$class = self::field_class( 'textarea', $required );
+		$error = self::state_error( $name );
+		$class = self::field_class( 'textarea', $required, '' !== $error );
 
 		$placeholder = isset( $attrs['placeholder'] ) ? $attrs['placeholder'] : '';
 		$default     = isset( $attrs['default'] ) ? $attrs['default'] : '';
+		$posted      = self::state_value( $name );
+		$value       = ( null !== $posted && ! is_array( $posted ) ) ? (string) $posted : $default;
 		$rows        = isset( $attrs['rows'] ) ? absint( $attrs['rows'] ) : 4;
 		$cols        = isset( $attrs['cols'] ) ? absint( $attrs['cols'] ) : 40;
 
@@ -456,7 +509,7 @@ class Oli_CF_Form_Parser {
 
 		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
-			'<textarea name="%s" id="%s" class="%s" rows="%d" cols="%d"%s%s%s aria-invalid="false">%s</textarea>',
+			'<textarea name="%s" id="%s" class="%s" rows="%d" cols="%d"%s%s%s%s>%s</textarea>',
 			esc_attr( $name ),
 			esc_attr( $id ),
 			esc_attr( $class ),
@@ -465,8 +518,10 @@ class Oli_CF_Form_Parser {
 			$required ? ' required="required" aria-required="true"' : '',
 			'' !== $placeholder ? ' placeholder="' . esc_attr( $placeholder ) . '"' : '',
 			self::length_attributes( $attrs ),
-			esc_textarea( $default )
+			self::invalid_attrs( $name, $error ),
+			esc_textarea( $value )
 		);
+		$html .= self::field_error_html( $name, $error );
 		$html .= '</span>';
 
 		return $html;
@@ -483,16 +538,20 @@ class Oli_CF_Form_Parser {
 	 * @return string HTML.
 	 */
 	private static function render_select( $name, $required, $attrs, $values, $form_id ) {
-		$id    = self::field_id( $form_id, $name );
-		$class = self::field_class( 'select', $required );
+		$id     = self::field_id( $form_id, $name );
+		$error  = self::state_error( $name );
+		$class  = self::field_class( 'select', $required, '' !== $error );
+		$posted = self::state_value( $name );
+		$posted = ( null !== $posted && ! is_array( $posted ) ) ? (string) $posted : null;
 
 		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
-			'<select name="%s" id="%s" class="%s"%s aria-invalid="false">',
+			'<select name="%s" id="%s" class="%s"%s%s>',
 			esc_attr( $name ),
 			esc_attr( $id ),
 			esc_attr( $class ),
-			$required ? ' required="required" aria-required="true"' : ''
+			$required ? ' required="required" aria-required="true"' : '',
+			self::invalid_attrs( $name, $error )
 		);
 
 		if ( $required || ! empty( $attrs['include_blank'] ) ) {
@@ -500,14 +559,18 @@ class Oli_CF_Form_Parser {
 		}
 
 		foreach ( $values as $option ) {
-			$html .= sprintf(
-				'<option value="%s">%s</option>',
+			$selected = ( null !== $posted && (string) $option === $posted ) ? ' selected="selected"' : '';
+			$html    .= sprintf(
+				'<option value="%s"%s>%s</option>',
 				esc_attr( $option ),
+				$selected,
 				esc_html( $option )
 			);
 		}
 
-		$html .= '</select></span>';
+		$html .= '</select>';
+		$html .= self::field_error_html( $name, $error );
+		$html .= '</span>';
 
 		return $html;
 	}
@@ -522,25 +585,38 @@ class Oli_CF_Form_Parser {
 	 * @return string HTML.
 	 */
 	private static function render_checkbox( $name, $required, $values, $form_id ) {
-		$id    = self::field_id( $form_id, $name );
-		$class = self::field_class( 'checkbox', $required );
+		$id     = self::field_id( $form_id, $name );
+		$error  = self::state_error( $name );
+		$class  = self::field_class( 'checkbox', $required, '' !== $error );
+		$posted = self::state_value( $name );
+		$chosen = array();
+
+		if ( is_array( $posted ) ) {
+			$chosen = $posted;
+		} elseif ( null !== $posted && '' !== $posted ) {
+			$chosen = array( $posted );
+		}
 
 		$html = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
 
 		foreach ( $values as $index => $option ) {
 			$checkbox_id = $id . '-' . absint( $index );
+			$checked     = in_array( $option, $chosen, true ) ? ' checked="checked"' : '';
 
 			$html .= sprintf(
-				'<span class="oli-cf-list-item"><label><input type="checkbox" name="%s[]" value="%s" id="%s" class="%s"%s /><span class="oli-cf-list-item-label">%s</span></label></span>',
+				'<span class="oli-cf-list-item"><label><input type="checkbox" name="%s[]" value="%s" id="%s" class="%s"%s%s%s /><span class="oli-cf-list-item-label">%s</span></label></span>',
 				esc_attr( $name ),
 				esc_attr( $option ),
 				esc_attr( $checkbox_id ),
 				esc_attr( $class ),
 				$required ? ' aria-required="true"' : '',
+				$checked,
+				self::invalid_attrs( $name, $error ),
 				esc_html( $option )
 			);
 		}
 
+		$html .= self::field_error_html( $name, $error );
 		$html .= '</span>';
 
 		return $html;
@@ -556,25 +632,32 @@ class Oli_CF_Form_Parser {
 	 * @return string HTML.
 	 */
 	private static function render_radio( $name, $required, $values, $form_id ) {
-		$id    = self::field_id( $form_id, $name );
-		$class = self::field_class( 'radio', $required );
+		$id     = self::field_id( $form_id, $name );
+		$error  = self::state_error( $name );
+		$class  = self::field_class( 'radio', $required, '' !== $error );
+		$posted = self::state_value( $name );
+		$posted = ( null !== $posted && ! is_array( $posted ) ) ? (string) $posted : null;
 
 		$html = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
 
 		foreach ( $values as $index => $option ) {
 			$radio_id = $id . '-' . absint( $index );
+			$checked  = ( null !== $posted && (string) $option === $posted ) ? ' checked="checked"' : '';
 
 			$html .= sprintf(
-				'<span class="oli-cf-list-item"><label><input type="radio" name="%s" value="%s" id="%s" class="%s"%s /><span class="oli-cf-list-item-label">%s</span></label></span>',
+				'<span class="oli-cf-list-item"><label><input type="radio" name="%s" value="%s" id="%s" class="%s"%s%s%s /><span class="oli-cf-list-item-label">%s</span></label></span>',
 				esc_attr( $name ),
 				esc_attr( $option ),
 				esc_attr( $radio_id ),
 				esc_attr( $class ),
 				$required ? ' required="required" aria-required="true"' : '',
+				$checked,
+				self::invalid_attrs( $name, $error ),
 				esc_html( $option )
 			);
 		}
 
+		$html .= self::field_error_html( $name, $error );
 		$html .= '</span>';
 
 		return $html;
@@ -590,19 +673,25 @@ class Oli_CF_Form_Parser {
 	 * @return string HTML.
 	 */
 	private static function render_acceptance( $name, $required, $values, $form_id ) {
-		$id    = self::field_id( $form_id, $name );
-		$label = ! empty( $values ) ? implode( ' ', $values ) : __( 'I accept the terms', 'oli-contact-form' );
-		$class = self::field_class( 'acceptance', $required );
+		$id      = self::field_id( $form_id, $name );
+		$label   = ! empty( $values ) ? implode( ' ', $values ) : __( 'I accept the terms', 'oli-contact-form' );
+		$error   = self::state_error( $name );
+		$class   = self::field_class( 'acceptance', $required, '' !== $error );
+		$posted  = self::state_value( $name );
+		$checked = ( null !== $posted && '1' === (string) $posted ) ? ' checked="checked"' : '';
 
 		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
-			'<span class="oli-cf-list-item"><label><input type="checkbox" name="%s" value="1" id="%s" class="%s"%s aria-invalid="false" /><span class="oli-cf-list-item-label">%s</span></label></span>',
+			'<span class="oli-cf-list-item"><label><input type="checkbox" name="%s" value="1" id="%s" class="%s"%s%s%s /><span class="oli-cf-list-item-label">%s</span></label></span>',
 			esc_attr( $name ),
 			esc_attr( $id ),
 			esc_attr( $class ),
 			$required ? ' required="required" aria-required="true"' : '',
+			$checked,
+			self::invalid_attrs( $name, $error ),
 			wp_kses_post( $label )
 		);
+		$html .= self::field_error_html( $name, $error );
 		$html .= '</span>';
 
 		return $html;
@@ -619,7 +708,8 @@ class Oli_CF_Form_Parser {
 	 */
 	private static function render_file( $name, $required, $attrs, $form_id ) {
 		$id    = self::field_id( $form_id, $name );
-		$class = self::field_class( 'file', $required );
+		$error = self::state_error( $name );
+		$class = self::field_class( 'file', $required, '' !== $error );
 
 		$types  = isset( $attrs['filetypes'] ) ? $attrs['filetypes'] : Oli_CF_Uploads::DEFAULT_FILETYPES;
 		$limit  = isset( $attrs['limit'] ) ? $attrs['limit'] : Oli_CF_Uploads::DEFAULT_LIMIT;
@@ -627,15 +717,17 @@ class Oli_CF_Form_Parser {
 
 		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
-			'<input type="file" name="%s" id="%s" class="%s"%s%s data-size-limit="%s" data-filetypes="%s" aria-invalid="false" />',
+			'<input type="file" name="%s" id="%s" class="%s"%s%s data-size-limit="%s" data-filetypes="%s"%s />',
 			esc_attr( $name ),
 			esc_attr( $id ),
 			esc_attr( $class ),
 			$required ? ' required="required" aria-required="true"' : '',
 			'' !== $accept ? ' accept="' . esc_attr( $accept ) . '"' : '',
 			esc_attr( $limit ),
-			esc_attr( $types )
+			esc_attr( $types ),
+			self::invalid_attrs( $name, $error )
 		);
+		$html .= self::field_error_html( $name, $error );
 		$html .= '</span>';
 
 		return $html;
@@ -704,17 +796,92 @@ class Oli_CF_Form_Parser {
 	/**
 	 * Field CSS class list.
 	 *
-	 * @param string $type     Field type.
-	 * @param bool   $required Is required.
+	 * @param string $type      Field type.
+	 * @param bool   $required  Is required.
+	 * @param bool   $invalid   Whether the field has a replayed error.
 	 * @return string
 	 */
-	private static function field_class( $type, $required ) {
+	private static function field_class( $type, $required, $invalid = false ) {
 		$class = 'oli-cf-field oli-cf-' . sanitize_html_class( $type );
 
 		if ( $required ) {
 			$class .= ' oli-cf-required';
 		}
 
+		if ( $invalid ) {
+			$class .= ' oli-cf-invalid';
+		}
+
 		return $class;
+	}
+
+	/**
+	 * Posted value for the field currently being rendered, if any.
+	 *
+	 * @param string $name Field name.
+	 * @return mixed
+	 */
+	private static function state_value( $name ) {
+		if ( '' === $name || ! isset( self::$render_state['values'] ) || ! is_array( self::$render_state['values'] ) ) {
+			return null;
+		}
+
+		if ( ! array_key_exists( $name, self::$render_state['values'] ) ) {
+			return null;
+		}
+
+		return self::$render_state['values'][ $name ];
+	}
+
+	/**
+	 * Replayed error message for a field.
+	 *
+	 * @param string $name Field name.
+	 * @return string
+	 */
+	private static function state_error( $name ) {
+		if ( '' === $name || ! isset( self::$render_state['errors'] ) || ! is_array( self::$render_state['errors'] ) ) {
+			return '';
+		}
+
+		if ( ! isset( self::$render_state['errors'][ $name ] ) || ! is_string( self::$render_state['errors'][ $name ] ) ) {
+			return '';
+		}
+
+		return self::$render_state['errors'][ $name ];
+	}
+
+	/**
+	 * aria-invalid / aria-describedby for a field with a replayed error.
+	 *
+	 * @param string $name  Field name.
+	 * @param string $error Error message.
+	 * @return string
+	 */
+	private static function invalid_attrs( $name, $error ) {
+		if ( '' === $error ) {
+			return ' aria-invalid="false"';
+		}
+
+		return ' aria-invalid="true" aria-describedby="' . esc_attr( 'oli-cf-err-' . sanitize_key( $name ) ) . '"';
+	}
+
+	/**
+	 * Per-field error span.
+	 *
+	 * @param string $name  Field name.
+	 * @param string $error Error message.
+	 * @return string
+	 */
+	private static function field_error_html( $name, $error ) {
+		if ( '' === $error ) {
+			return '';
+		}
+
+		return sprintf(
+			'<span class="oli-cf-field-error" id="%s">%s</span>',
+			esc_attr( 'oli-cf-err-' . sanitize_key( $name ) ),
+			esc_html( $error )
+		);
 	}
 }

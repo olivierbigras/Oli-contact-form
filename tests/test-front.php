@@ -51,6 +51,12 @@ oli_cf_assert_true( false !== strpos( $js, "=== 'v3'" ), 'execute is gated on ve
 oli_cf_assert_true( false !== strpos( $js, 'responseJSON' ), 'AJAX error handler reads JSON success payloads' );
 oli_cf_assert_true( false !== strpos( $js, 'oli-cf-field-error' ), 'JS writes per-field error messages' );
 oli_cf_assert_true( false !== strpos( $js, 'aria-describedby' ), 'JS links errors with aria-describedby' );
+oli_cf_assert_true( (bool) preg_match( '/handleAjaxResponse:\s*function[\s\S]*?var self = this;/', $js ), 'handleAjaxResponse binds var self = this' );
+oli_cf_assert_true( false !== strpos( $js, 'resetSubmit' ), 'submit button reset helper exists' );
+oli_cf_assert_true( false !== strpos( $js, 'complete:' ), 'AJAX complete resets the submit button' );
+oli_cf_assert_true( false !== strpos( $js, 'errorBannerOne' ), 'singular error banner string is used' );
+oli_cf_assert_true( false !== strpos( $js, 'errorBannerMany' ), 'plural error banner string is used' );
+oli_cf_assert_true( false !== strpos( $js, ' : ' ), 'error summary prefixes the field label' );
 
 $css = file_get_contents( dirname( __DIR__ ) . '/assets/css/oli-cf-public.css' );
 oli_cf_assert_true( false !== strpos( $css, '#8c8f94' ), 'field border uses the contrast color' );
@@ -106,6 +112,63 @@ oli_cf_assert_true( (bool) $js_v3_gate, 'v3 execute is not used for v2' );
 $submission_src = file_get_contents( dirname( __DIR__ ) . '/includes/class-oli-cf-submission.php' );
 oli_cf_assert_true( false !== strpos( $submission_src, 'wp_doing_ajax()' ), 'non-AJAX handler returns when wp_doing_ajax' );
 oli_cf_assert_true( false !== strpos( $submission_src, 'wp_validate_redirect' ), 'redirect URL is validated' );
+oli_cf_assert_true( false !== strpos( $submission_src, 'oli_cf_status' ), 'non-AJAX redirect sets oli_cf_status' );
+oli_cf_assert_true( false !== strpos( $submission_src, 'oli_cf_token' ), 'non-AJAX redirect sets a feedback token' );
+oli_cf_assert_true( false !== strpos( $submission_src, 'store_feedback' ), 'validation feedback is stored in a transient' );
+
+oli_cf_assert_same( 'validation', Oli_CF_Submission::normalize_status( array( 'success' => false, 'status' => 'validation' ) ), 'validation status is kept' );
+oli_cf_assert_same( 'mail_failed', Oli_CF_Submission::normalize_status( array( 'success' => false, 'status' => 'mail_failed' ) ), 'mail_failed status is kept' );
+oli_cf_assert_same( 'success', Oli_CF_Submission::normalize_status( array( 'success' => true ) ), 'success status is normalized' );
+
+$GLOBALS['oli_cf_test_transients'] = array();
+$token = Oli_CF_Submission::store_feedback(
+	12,
+	array(
+		'success' => false,
+		'status'  => 'validation',
+		'message' => 'One or more fields have an error. Please check and try again.',
+		'errors'  => array(
+			'your-email' => 'Please enter a valid email address.',
+		),
+		'values'  => array(
+			'your-name'  => 'Ada',
+			'your-email' => 'not-an-email',
+		),
+	)
+);
+oli_cf_assert_true( is_string( $token ) && strlen( $token ) >= 12, 'feedback token is generated' );
+oli_cf_assert_true( isset( $GLOBALS['oli_cf_test_transients'][ 'oli_cf_fb_' . $token ] ), 'feedback is stored under the token' );
+oli_cf_assert_same( 300, $GLOBALS['oli_cf_test_transients'][ 'oli_cf_fb_' . $token ]['ttl'], 'feedback transient lasts 5 minutes' );
+
+$wrong_form = Oli_CF_Submission::consume_feedback( $token, 99 );
+oli_cf_assert_same( array(), $wrong_form, 'feedback for another form is rejected' );
+
+$feedback = Oli_CF_Submission::consume_feedback( $token, 12 );
+oli_cf_assert_same( 'validation', $feedback['status'], 'consumed feedback keeps validation status' );
+oli_cf_assert_same( 'Ada', $feedback['values']['your-name'], 'sanitized values are replayed from the transient' );
+oli_cf_assert_true( isset( $feedback['errors']['your-email'] ), 'field errors are replayed from the transient' );
+oli_cf_assert_false( get_transient( 'oli_cf_fb_' . $token ), 'feedback transient is deleted after consume' );
+
+$replay = Oli_CF_Form_Parser::parse(
+	'<label> Your email [email* your-email] </label>',
+	12,
+	array(
+		'values' => array( 'your-email' => 'not-an-email' ),
+		'errors' => array( 'your-email' => 'Please enter a valid email address.' ),
+	)
+);
+oli_cf_assert_true( false !== strpos( $replay, 'value="not-an-email"' ), 'invalid email is repopulated after no-JS validation' );
+oli_cf_assert_true( false !== strpos( $replay, 'aria-invalid="true"' ), 'repopulated invalid field is aria-invalid' );
+oli_cf_assert_true( false !== strpos( $replay, 'oli-cf-field-error' ), 'repopulated field shows a per-field error' );
+oli_cf_assert_true( false !== strpos( $replay, 'Please enter a valid email address.' ), 'repopulated error text is shown' );
+
+$shortcode_src = file_get_contents( dirname( __DIR__ ) . '/public/class-oli-cf-shortcode.php' );
+oli_cf_assert_true( false !== strpos( $shortcode_src, 'tabindex="-1"' ), 'response output is focusable' );
+oli_cf_assert_true( false !== strpos( $shortcode_src, 'oli_cf_status' ), 'shortcode reads oli_cf_status' );
+oli_cf_assert_true( false !== strpos( $shortcode_src, 'consume_feedback' ), 'shortcode consumes the feedback token' );
+
+$submit_html = Oli_CF_Form_Parser::parse( '[submit "Send"]', 8 );
+oli_cf_assert_same( false, strpos( $submit_html, 'disabled' ), 'submit button is not disabled without JS' );
 
 if ( $oli_cf_failures > 0 ) {
 	fwrite( STDERR, "\n{$oli_cf_failures} front test(s) failed.\n" );

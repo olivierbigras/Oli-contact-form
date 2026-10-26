@@ -145,6 +145,15 @@ span.oli-cf-required {
 	margin-bottom: 15px;
 }
 
+.oli-cf-response-output:focus {
+	outline: none;
+}
+
+.oli-cf-response-output:focus-visible {
+	outline: 2px solid #0073aa;
+	outline-offset: 2px;
+}
+
 .oli-cf-response-success,
 .oli-cf-response-error {
 	padding: 12px 15px;
