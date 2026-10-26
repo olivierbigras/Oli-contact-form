@@ -126,6 +126,8 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 3. Form displayed on the frontend
 4. Gutenberg block settings
 5. CF7 importer
+6. Success message after a submission.
+7. Validation errors: required field and invalid email address.
 
 == Changelog ==
 
