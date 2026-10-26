@@ -18,10 +18,7 @@ class Oli_CF_Deactivator {
 	 * Deactivate the plugin.
 	 */
 	public static function deactivate() {
-		require_once plugin_dir_path( __FILE__ ) . 'class-oli-cf-message-store.php';
-
-		Oli_CF_Message_Store::unschedule_cron();
-
+		wp_clear_scheduled_hook( 'oli_cf_purge_stored_messages' );
 		flush_rewrite_rules();
 	}
 }

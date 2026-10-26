@@ -6,33 +6,32 @@
 	'use strict';
 
 	$(document).ready(function() {
-		// Tag generator buttons
+		var strings = (window.oliCfAdmin && oliCfAdmin.strings) ? oliCfAdmin.strings : {};
+
 		$('.oli-cf-tag-gen').on('click', function(e) {
 			e.preventDefault();
-			
+
 			var tagType = $(this).data('tag-type');
 			var tag = generateTag(tagType);
-			
+
 			if (tag) {
 				insertAtCursor($('#oli-cf-form-template')[0], tag);
 			}
 		});
 
-		/**
-		 * Generate tag based on type
-		 */
 		function generateTag(type) {
-			var name = prompt('Enter field name (e.g., "your-name"):');
-			
-			if (!name) {
+			var name = prompt(strings.field_name || 'Enter field name (e.g., "your-name"):');
+
+			if (!name && type !== 'submit') {
 				return null;
 			}
 
-			// Sanitize name
-			name = name.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+			if (name) {
+				name = name.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+			}
 
 			var tag = '';
-			var required = confirm('Is this field required?');
+			var required = (type !== 'submit') ? confirm(strings.required || 'Is this field required?') : false;
 			var requiredMark = required ? '*' : '';
 
 			switch (type) {
@@ -50,37 +49,42 @@
 					break;
 
 				case 'select':
-					var options = prompt('Enter options (separated by spaces, quote multi-word options):');
-					if (!options) return null;
-					tag = '[select' + requiredMark + ' ' + name + ' ' + options + ']';
-					break;
-
 				case 'checkbox':
 				case 'radio':
-					var options = prompt('Enter options (separated by spaces, quote multi-word options):');
-					if (!options) return null;
+					var options = prompt(strings.options || 'Enter options (separated by spaces, quote multi-word options):');
+					if (!options) {
+						return null;
+					}
 					tag = '[' + type + requiredMark + ' ' + name + ' ' + options + ']';
 					break;
 
 				case 'acceptance':
-					var label = prompt('Enter acceptance text:', 'I accept the terms');
-					if (!label) return null;
-					tag = '[acceptance ' + name + ' "' + label + '"]';
+					var acceptLabel = prompt(strings.acceptance || 'Enter acceptance text:', strings.acceptance_def || 'I accept the terms');
+					if (!acceptLabel) {
+						return null;
+					}
+					tag = '[acceptance' + requiredMark + ' ' + name + ' "' + acceptLabel + '"]';
 					break;
 
 				case 'file':
-					var limit = prompt('File size limit (e.g., "2mb"):', '5mb');
-					var types = prompt('Allowed file types (e.g., "jpg|png|pdf"):', 'jpg|png|pdf');
+					var limit = prompt(strings.file_limit || 'File size limit (e.g., "2mb"):', '5mb');
+					var types = prompt(strings.file_types || 'Allowed file types (e.g., "jpg|png|pdf"):', 'jpg|png|pdf');
 					tag = '[file' + requiredMark + ' ' + name;
-					if (limit) tag += ' limit:' + limit;
-					if (types) tag += ' filetypes:' + types;
+					if (limit) {
+						tag += ' limit:' + limit;
+					}
+					if (types) {
+						tag += ' filetypes:' + types;
+					}
 					tag += ']';
 					break;
 
 				case 'submit':
-					var label = prompt('Button text:', 'Send');
-					if (!label) return null;
-					tag = '[submit "' + label + '"]';
+					var buttonLabel = prompt(strings.button_text || 'Button text:', strings.send || 'Send');
+					if (!buttonLabel) {
+						return null;
+					}
+					tag = '[submit "' + buttonLabel + '"]';
 					break;
 
 				default:
@@ -90,10 +94,11 @@
 			return tag;
 		}
 
-		/**
-		 * Insert text at cursor position
-		 */
 		function insertAtCursor(field, text) {
+			if (!field) {
+				return;
+			}
+
 			if (field.selectionStart || field.selectionStart === 0) {
 				var startPos = field.selectionStart;
 				var endPos = field.selectionEnd;
@@ -103,7 +108,7 @@
 			} else {
 				field.value += text;
 			}
-			
+
 			field.focus();
 		}
 	});

@@ -20,7 +20,11 @@ class Oli_CF_Submission {
 	public function handle_ajax_submission() {
 		check_ajax_referer( 'oli_cf_submit', 'nonce' );
 
-		$form_id = isset( $_POST['form_id'] ) ? absint( $_POST['form_id'] ) : 0;
+		$form_id = isset( $_POST['form_id'] ) ? absint( wp_unslash( $_POST['form_id'] ) ) : 0;
+
+		if ( ! $form_id && isset( $_POST['oli_cf_form_id'] ) ) {
+			$form_id = absint( wp_unslash( $_POST['oli_cf_form_id'] ) );
+		}
 
 		if ( ! $form_id ) {
 			wp_send_json_error(
@@ -30,13 +34,13 @@ class Oli_CF_Submission {
 			);
 		}
 
-		$result = $this->process_submission( $form_id, $_POST, $_FILES );
+		$result = $this->process_submission( $form_id, wp_unslash( $_POST ), $this->normalize_files( $_FILES ) );
 
 		if ( $result['success'] ) {
 			wp_send_json_success( $result );
-		} else {
-			wp_send_json_error( $result );
 		}
+
+		wp_send_json_error( $result );
 	}
 
 	/**
@@ -47,21 +51,23 @@ class Oli_CF_Submission {
 			return;
 		}
 
-		$form_id = absint( $_POST['oli_cf_form_id'] );
+		$form_id = absint( wp_unslash( $_POST['oli_cf_form_id'] ) );
 
 		if ( ! $form_id ) {
 			return;
 		}
 
-		// Verify nonce.
 		if ( ! isset( $_POST['oli_cf_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['oli_cf_nonce'] ) ), 'oli_cf_submit_' . $form_id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'oli-contact-form' ) );
 		}
 
-		$result = $this->process_submission( $form_id, $_POST, $_FILES );
+		$result = $this->process_submission( $form_id, wp_unslash( $_POST ), $this->normalize_files( $_FILES ) );
 
-		// Redirect with result.
 		$redirect_url = wp_get_referer();
+
+		if ( ! $redirect_url ) {
+			$redirect_url = home_url( '/' );
+		}
 
 		$status_args = array(
 			'oli_cf_status_nonce' => wp_create_nonce( 'oli_cf_status_' . $form_id ),
@@ -73,21 +79,19 @@ class Oli_CF_Submission {
 			$status_args['oli_cf_error'] = $form_id;
 		}
 
-		$redirect_url = add_query_arg( $status_args, $redirect_url );
-
-		wp_safe_redirect( $redirect_url );
+		wp_safe_redirect( add_query_arg( $status_args, $redirect_url ) );
 		exit;
 	}
 
 	/**
 	 * Process form submission.
 	 *
-	 * @param int   $form_id Form ID.
-	 * @param array $post    POST data.
-	 * @param array $files   FILES data.
-	 * @return array Result array with success status and message.
+	 * @param int                  $form_id Form ID.
+	 * @param array<string, mixed> $post    POST data (already unslashed).
+	 * @param array<string, mixed> $files   FILES data.
+	 * @return array<string, mixed>
 	 */
-	private function process_submission( $form_id, $post, $files ) {
+	public function process_submission( $form_id, $post, $files ) {
 		$form = get_post( $form_id );
 
 		if ( ! $form || 'oli_contact_form' !== $form->post_type ) {
@@ -98,7 +102,7 @@ class Oli_CF_Submission {
 		}
 
 		$template = get_post_meta( $form_id, '_oli_cf_form_template', true );
-		$messages = get_post_meta( $form_id, '_oli_cf_messages', true );
+		$messages = Oli_CF_Validator::normalize_messages( get_post_meta( $form_id, '_oli_cf_messages', true ) );
 
 		if ( empty( $template ) ) {
 			return array(
@@ -107,11 +111,20 @@ class Oli_CF_Submission {
 			);
 		}
 
-		// Hook: Before validation.
-		do_action( 'oli_cf_before_validation', $form_id, $post, $files );
+		$data   = $this->sanitize_posted_data( $post );
+		$fields = Oli_CF_Form_Parser::parse_fields( $template );
 
-		// Anti-spam check.
-		$spam_check = Oli_CF_Anti_Spam::check( $post );
+		/**
+		 * Fires before validation.
+		 *
+		 * @param int                  $form_id Form ID.
+		 * @param array<string, mixed> $data    Sanitized posted data.
+		 * @param array<string, mixed> $files   Files.
+		 */
+		do_action( 'oli_cf_before_validation', $form_id, $data, $files );
+
+		$spam_check = Oli_CF_Anti_Spam::check( $data );
+
 		if ( is_array( $spam_check ) ) {
 			return array(
 				'success' => false,
@@ -119,50 +132,124 @@ class Oli_CF_Submission {
 			);
 		}
 
-		// Validate form data.
-		$validation = Oli_CF_Validator::validate( $post, $template, $files );
+		$validation = Oli_CF_Validator::validate( $data, $template, $files, $messages );
 
 		if ( is_array( $validation ) ) {
 			return array(
 				'success' => false,
-				'message' => ! empty( $messages['validation_error'] ) ? $messages['validation_error'] : __( 'Please correct the errors below.', 'oli-contact-form' ),
+				'message' => $messages['validation_error'],
 				'errors'  => $validation,
 			);
 		}
 
-		// Hook: Before send.
-		do_action( 'oli_cf_before_send', $form_id, $post, $files );
+		$staged = Oli_CF_Uploads::stage_files( $files, $fields );
 
-		// Send email.
-		$sent = Oli_CF_Mailer::send( $form_id, $post, $files );
+		/**
+		 * Fires before sending mail.
+		 *
+		 * @param int                  $form_id Form ID.
+		 * @param array<string, mixed> $data    Sanitized posted data.
+		 * @param string[]             $staged  Staged attachment paths.
+		 */
+		do_action( 'oli_cf_before_send', $form_id, $data, $staged );
 
-		if ( $sent ) {
-			Oli_CF_Message_Store::maybe_save( $form_id, $post, $files );
-		}
+		$sent = Oli_CF_Mailer::send( $form_id, $data, array_values( $staged ) );
 
-		// Clean up uploaded files.
-		if ( ! empty( $files ) ) {
-			foreach ( $files as $file ) {
-				if ( ! empty( $file['tmp_name'] ) && file_exists( $file['tmp_name'] ) ) {
-					// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-					unlink( $file['tmp_name'] );
-				}
-			}
-		}
+		Oli_CF_Uploads::delete_files( $staged );
 
 		if ( ! $sent ) {
 			return array(
 				'success' => false,
-				'message' => ! empty( $messages['mail_sent_ng'] ) ? $messages['mail_sent_ng'] : __( 'There was an error sending your message. Please try again.', 'oli-contact-form' ),
+				'message' => $messages['mail_sent_ng'],
 			);
 		}
 
-		// Hook: After send.
-		do_action( 'oli_cf_after_send', $form_id, $post, $files );
+		/**
+		 * Fires after a successful send. Uploaded files have already been deleted.
+		 *
+		 * @param int                  $form_id Form ID.
+		 * @param array<string, mixed> $data    Sanitized posted data.
+		 */
+		do_action( 'oli_cf_after_send', $form_id, $data );
 
 		return array(
 			'success' => true,
-			'message' => ! empty( $messages['mail_sent_ok'] ) ? $messages['mail_sent_ok'] : __( 'Thank you for your message. It has been sent.', 'oli-contact-form' ),
+			'message' => $messages['mail_sent_ok'],
 		);
+	}
+
+	/**
+	 * Sanitize posted fields used in mail and validation.
+	 *
+	 * @param array<string, mixed> $post Posted data.
+	 * @return array<string, mixed>
+	 */
+	private function sanitize_posted_data( $post ) {
+		$clean = array();
+
+		if ( ! is_array( $post ) ) {
+			return $clean;
+		}
+
+		$skip = array(
+			'action',
+			'nonce',
+			'oli_cf_nonce',
+			'_wpnonce',
+			'_wp_http_referer',
+		);
+
+		foreach ( $post as $key => $value ) {
+			$key = is_string( $key ) ? $key : (string) $key;
+
+			if ( in_array( $key, $skip, true ) ) {
+				continue;
+			}
+
+			if ( is_array( $value ) ) {
+				$clean[ $key ] = array_map( 'sanitize_text_field', $value );
+				continue;
+			}
+
+			$value = (string) $value;
+
+			if ( strlen( $value ) > 200 ) {
+				$clean[ $key ] = sanitize_textarea_field( $value );
+			} else {
+				$clean[ $key ] = sanitize_text_field( $value );
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Keep only the keys needed from $_FILES.
+	 *
+	 * @param array<string, mixed> $files Files array.
+	 * @return array<string, mixed>
+	 */
+	private function normalize_files( $files ) {
+		$out = array();
+
+		if ( ! is_array( $files ) ) {
+			return $out;
+		}
+
+		foreach ( $files as $key => $file ) {
+			if ( ! is_array( $file ) ) {
+				continue;
+			}
+
+			$out[ $key ] = array(
+				'name'     => isset( $file['name'] ) ? sanitize_file_name( (string) $file['name'] ) : '',
+				'type'     => isset( $file['type'] ) ? sanitize_text_field( (string) $file['type'] ) : '',
+				'tmp_name' => isset( $file['tmp_name'] ) ? (string) $file['tmp_name'] : '',
+				'error'    => isset( $file['error'] ) ? (int) $file['error'] : 0,
+				'size'     => isset( $file['size'] ) ? (int) $file['size'] : 0,
+			);
+		}
+
+		return $out;
 	}
 }

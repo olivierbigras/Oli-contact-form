@@ -26,14 +26,3 @@
 .oli-cf-form-control-wrap {
 	display: inline-block;
 }
-
-.oli-cf-message-detail {
-	max-width: 800px;
-	margin-top: 16px;
-}
-
-.oli-cf-message-detail th {
-	width: 180px;
-	text-align: left;
-	vertical-align: top;
-}

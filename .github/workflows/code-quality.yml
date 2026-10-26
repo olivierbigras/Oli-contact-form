@@ -29,8 +29,8 @@ jobs:
         composer global require "squizlabs/php_codesniffer:^3.13.5" "wp-coding-standards/wpcs:^3.1"
         echo "$(composer global config home --quiet)/vendor/bin" >> "$GITHUB_PATH"
 
-    - name: Run PHPCS
-      run: phpcs --standard=WordPress --extensions=php --ignore=vendor/,tests/ .
+    - name: Run PHPCS WordPress-Extra
+      run: phpcs --standard=WordPress-Extra --extensions=php --ignore=vendor/,tests/ .
 
     - name: Run unit tests
-      run: php tests/test-message-store.php
+      run: php tests/run.php

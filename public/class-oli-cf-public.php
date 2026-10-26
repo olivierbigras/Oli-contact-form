@@ -73,7 +73,12 @@ class Oli_CF_Public {
 		}
 
 		$settings = get_option( 'oli_cf_settings', array() );
-		$deps     = array( 'jquery' );
+
+		if ( ! is_array( $settings ) ) {
+			$settings = array();
+		}
+
+		$deps = array( 'jquery' );
 
 		if ( self::recaptcha_client_should_load( $settings ) ) {
 			wp_enqueue_script(
@@ -123,6 +128,10 @@ class Oli_CF_Public {
 				'nonce'            => wp_create_nonce( 'oli_cf_submit' ),
 				'recaptchaSiteKey' => self::recaptcha_client_should_load( $settings ) ? $settings['recaptcha_site_key'] : '',
 				'turnstileSiteKey' => self::turnstile_client_should_load( $settings ) ? $settings['turnstile_site_key'] : '',
+				'strings'          => array(
+					'validationError' => __( 'One or more fields have an error. Please check and try again.', 'oli-contact-form' ),
+					'unexpectedError' => __( 'An unexpected error occurred. Please try again.', 'oli-contact-form' ),
+				),
 			)
 		);
 
@@ -132,7 +141,7 @@ class Oli_CF_Public {
 	/**
 	 * Whether the official reCAPTCHA client script should load on this request.
 	 *
-	 * @param array $settings Plugin settings.
+	 * @param array<string, mixed> $settings Plugin settings.
 	 * @return bool
 	 */
 	private static function recaptcha_client_should_load( $settings ) {
@@ -142,7 +151,7 @@ class Oli_CF_Public {
 	/**
 	 * Whether the official Turnstile client script should load on this request.
 	 *
-	 * @param array $settings Plugin settings.
+	 * @param array<string, mixed> $settings Plugin settings.
 	 * @return bool
 	 */
 	private static function turnstile_client_should_load( $settings ) {
@@ -162,6 +171,7 @@ class Oli_CF_Public {
 		}
 
 		$queried = get_queried_object();
+
 		if ( $queried instanceof WP_Post && self::content_has_form( $queried->post_content ) ) {
 			return true;
 		}
@@ -189,6 +199,7 @@ class Oli_CF_Public {
 		}
 
 		$settings = get_option( 'oli_cf_settings', array() );
+
 		if ( ! empty( $settings['cf7_compat_enabled'] ) && has_shortcode( $content, 'contact-form-7' ) ) {
 			return true;
 		}

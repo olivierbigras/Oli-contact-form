@@ -18,8 +18,16 @@ Loading is gated:
 2. The client script is enqueued only when a form is present on the page (shortcode `[oli_contact_form]`, the `oli-cf/contact-form` block, or a mapped CF7 shortcode when compatibility mode is on).
 3. `siteverify` runs only on form submit, and only if that service is enabled.
 
-The built-in honeypot and time trap never leave the site. Secret keys stay in the options table and are never printed in storefront HTML or JavaScript.
+The built-in honeypot never leaves the site. Secret keys stay in the options table and are never printed in storefront HTML or JavaScript.
 
 The same justification is in `readme.txt` under **External services**, with terms and privacy links for each provider.
 
 Each remote URL has a `phpcs:ignore` comment naming the Plugin Check sniff and this reason.
+
+## Translations
+
+The plugin does not call `load_plugin_textdomain()` and does not ship `.po` or `.mo` files. The text domain is `oli-contact-form`.
+
+## No submission storage
+
+Form submissions are sent with `wp_mail()` only. File uploads are copied to a temporary path, attached to the notification email, and deleted immediately after send.

@@ -15,53 +15,85 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Oli_CF_Validator {
 
 	/**
+	 * Default editable messages.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function default_messages() {
+		return array(
+			'mail_sent_ok'          => __( 'Thank you for your message. It has been sent.', 'oli-contact-form' ),
+			'mail_sent_ng'          => __( 'There was an error sending your message. Please try again.', 'oli-contact-form' ),
+			'validation_error'      => __( 'One or more fields have an error. Please check and try again.', 'oli-contact-form' ),
+			'invalid_required'      => __( 'This field is required.', 'oli-contact-form' ),
+			'invalid_email'         => __( 'Please enter a valid email address.', 'oli-contact-form' ),
+			'invalid_tel'           => __( 'Please enter a valid phone number.', 'oli-contact-form' ),
+			'invalid_url'           => __( 'Please enter a valid URL.', 'oli-contact-form' ),
+			'invalid_number'        => __( 'Please enter a valid number.', 'oli-contact-form' ),
+			'invalid_date'          => __( 'Please enter a valid date.', 'oli-contact-form' ),
+			'accept_terms'          => __( 'You must accept this to proceed.', 'oli-contact-form' ),
+			'upload_failed'         => __( 'File upload failed.', 'oli-contact-form' ),
+			'upload_file_too_large' => __( 'The uploaded file is too large.', 'oli-contact-form' ),
+			'upload_file_type'      => __( 'This file type is not allowed.', 'oli-contact-form' ),
+		);
+	}
+
+	/**
+	 * Merge saved messages with defaults.
+	 *
+	 * @param mixed $messages Saved messages.
+	 * @return array<string, string>
+	 */
+	public static function normalize_messages( $messages ) {
+		$defaults = self::default_messages();
+
+		if ( ! is_array( $messages ) ) {
+			return $defaults;
+		}
+
+		foreach ( $defaults as $key => $default ) {
+			if ( isset( $messages[ $key ] ) && is_string( $messages[ $key ] ) && '' !== trim( $messages[ $key ] ) ) {
+				$defaults[ $key ] = $messages[ $key ];
+			}
+		}
+
+		return $defaults;
+	}
+
+	/**
 	 * Validate form data.
 	 *
-	 * @param array  $data       Posted data.
-	 * @param string $template   Form template.
-	 * @param array  $files      Uploaded files.
-	 * @return array|bool Array of errors or true if valid.
+	 * @param array<string, mixed> $data     Posted data.
+	 * @param string               $template Form template.
+	 * @param array<string, mixed> $files    Uploaded files.
+	 * @param array<string, string>|null $messages Editable messages.
+	 * @return array<string, string>|true Array of errors or true if valid.
 	 */
-	public static function validate( $data, $template, $files = array() ) {
-		$errors = array();
+	public static function validate( $data, $template, $files = array(), $messages = null ) {
+		$messages = self::normalize_messages( $messages );
+		$errors   = array();
+		$fields   = Oli_CF_Form_Parser::parse_fields( $template );
 
-		// Extract all field tags from template.
-		preg_match_all( '/\[([^\]]+)\]/', $template, $matches );
-
-		if ( empty( $matches[1] ) ) {
+		if ( empty( $fields ) ) {
 			return true;
 		}
 
-		foreach ( $matches[1] as $tag ) {
-			$tag   = trim( $tag );
-			$parts = preg_split( '/\s+/', $tag );
+		if ( ! is_array( $data ) ) {
+			$data = array();
+		}
 
-			if ( empty( $parts ) ) {
+		if ( ! is_array( $files ) ) {
+			$files = array();
+		}
+
+		foreach ( $fields as $field ) {
+			if ( empty( $field['name'] ) || 'submit' === $field['type'] ) {
 				continue;
 			}
 
-			$type_raw = array_shift( $parts );
-			$required = false;
-
-			// Check for required marker.
-			if ( substr( $type_raw, -1 ) === '*' ) {
-				$required = true;
-				$type     = rtrim( $type_raw, '*' );
-			} else {
-				$type = $type_raw;
-			}
-
-			$name = ! empty( $parts ) ? array_shift( $parts ) : '';
-
-			if ( empty( $name ) || 'submit' === $type ) {
-				continue;
-			}
-
-			// Validate based on type.
-			$error = self::validate_field( $type, $name, $data, $files, $required, $parts );
+			$error = self::validate_field( $field, $data, $files, $messages );
 
 			if ( $error ) {
-				$errors[ $name ] = $error;
+				$errors[ $field['name'] ] = $error;
 			}
 		}
 
@@ -69,170 +101,141 @@ class Oli_CF_Validator {
 	}
 
 	/**
-	 * Validate a single field.
+	 * Validate a single parsed field.
 	 *
-	 * @param string $type     Field type.
-	 * @param string $name     Field name.
-	 * @param array  $data     Posted data.
-	 * @param array  $files    Uploaded files.
-	 * @param bool   $required Is required.
-	 * @param array  $options  Field options.
+	 * @param array<string, mixed> $field    Field definition.
+	 * @param array<string, mixed> $data     Posted data.
+	 * @param array<string, mixed> $files    Uploaded files.
+	 * @param array<string, string> $messages Messages.
 	 * @return string|false Error message or false if valid.
 	 */
-	private static function validate_field( $type, $name, $data, $files, $required, $options ) {
-		$value = isset( $data[ $name ] ) ? $data[ $name ] : '';
+	public static function validate_field( $field, $data, $files, $messages ) {
+		$type     = isset( $field['type'] ) ? $field['type'] : '';
+		$name     = isset( $field['name'] ) ? $field['name'] : '';
+		$required = ! empty( $field['required'] );
+		$value    = isset( $data[ $name ] ) ? $data[ $name ] : '';
 
-		// Check required.
 		if ( $required ) {
 			if ( 'file' === $type ) {
-				if ( empty( $files[ $name ] ) || empty( $files[ $name ]['name'] ) ) {
-					return __( 'This field is required.', 'oli-contact-form' );
+				if ( empty( $files[ $name ] ) || ! Oli_CF_Uploads::file_was_uploaded( $files[ $name ] ) ) {
+					return $messages['invalid_required'];
 				}
 			} elseif ( 'checkbox' === $type ) {
 				if ( empty( $value ) || ! is_array( $value ) ) {
-					return __( 'This field is required.', 'oli-contact-form' );
+					return $messages['invalid_required'];
 				}
 			} elseif ( 'acceptance' === $type ) {
-				if ( empty( $value ) || '1' !== $value ) {
-					return __( 'You must accept this to proceed.', 'oli-contact-form' );
+				if ( empty( $value ) || '1' !== (string) $value ) {
+					return $messages['accept_terms'];
 				}
-			} elseif ( empty( $value ) && '0' !== $value ) {
-				return __( 'This field is required.', 'oli-contact-form' );
+			} elseif ( '' === $value || false === $value || ( is_array( $value ) && empty( $value ) ) ) {
+				if ( '0' !== $value ) {
+					return $messages['invalid_required'];
+				}
 			}
 		}
 
-		// Skip type validation if empty and not required.
-		if ( empty( $value ) && ! $required ) {
+		if ( 'file' === $type ) {
+			if ( empty( $files[ $name ] ) || ! Oli_CF_Uploads::file_was_uploaded( $files[ $name ] ) ) {
+				return false;
+			}
+
+			return self::validate_file( $files[ $name ], isset( $field['attributes'] ) ? $field['attributes'] : array(), $messages );
+		}
+
+		if ( ( '' === $value || false === $value || ( is_array( $value ) && empty( $value ) ) ) && ! $required ) {
 			return false;
 		}
 
-		// Type-specific validation.
+		if ( is_array( $value ) ) {
+			return false;
+		}
+
 		switch ( $type ) {
 			case 'email':
 				if ( ! is_email( $value ) ) {
-					return __( 'Please enter a valid email address.', 'oli-contact-form' );
+					return $messages['invalid_email'];
 				}
 				break;
 
 			case 'url':
 				if ( ! filter_var( $value, FILTER_VALIDATE_URL ) ) {
-					return __( 'Please enter a valid URL.', 'oli-contact-form' );
+					return $messages['invalid_url'];
 				}
 				break;
 
 			case 'tel':
-				// Basic phone validation.
-				if ( ! preg_match( '/^[\d\s\+\-\(\)]+$/', $value ) ) {
-					return __( 'Please enter a valid phone number.', 'oli-contact-form' );
+			case 'phone':
+				if ( ! preg_match( '/^[\d\s\+\-\(\)]+$/', (string) $value ) ) {
+					return $messages['invalid_tel'];
 				}
 				break;
 
 			case 'number':
 				if ( ! is_numeric( $value ) ) {
-					return __( 'Please enter a valid number.', 'oli-contact-form' );
+					return $messages['invalid_number'];
 				}
 				break;
 
 			case 'date':
-				$timestamp = strtotime( $value );
+				$timestamp = strtotime( (string) $value );
 				if ( false === $timestamp ) {
-					return __( 'Please enter a valid date.', 'oli-contact-form' );
+					return $messages['invalid_date'];
 				}
 				break;
-
-			case 'file':
-				return self::validate_file( $name, $files, $options );
 		}
 
 		return false;
 	}
 
 	/**
-	 * Validate uploaded file.
+	 * Validate an uploaded file.
 	 *
-	 * @param string $name    Field name.
-	 * @param array  $files   Uploaded files.
-	 * @param array  $options Field options.
-	 * @return string|false Error message or false if valid.
+	 * @param array<string, mixed>  $file       File array.
+	 * @param array<string, string> $attributes Field attributes.
+	 * @param array<string, string> $messages   Messages.
+	 * @return string|false
 	 */
-	private static function validate_file( $name, $files, $options ) {
-		if ( empty( $files[ $name ] ) ) {
-			return false;
-		}
-
-		$file = $files[ $name ];
-
-		// Check upload errors.
-		if ( ! empty( $file['error'] ) ) {
-			switch ( $file['error'] ) {
+	public static function validate_file( $file, $attributes, $messages ) {
+		if ( ! empty( $file['error'] ) && UPLOAD_ERR_OK !== (int) $file['error'] ) {
+			switch ( (int) $file['error'] ) {
 				case UPLOAD_ERR_INI_SIZE:
 				case UPLOAD_ERR_FORM_SIZE:
-					return __( 'The uploaded file is too large.', 'oli-contact-form' );
-				case UPLOAD_ERR_PARTIAL:
-					return __( 'The file was only partially uploaded.', 'oli-contact-form' );
-				case UPLOAD_ERR_NO_FILE:
-					return __( 'No file was uploaded.', 'oli-contact-form' );
+					return $messages['upload_file_too_large'];
 				default:
-					return __( 'File upload failed.', 'oli-contact-form' );
+					return $messages['upload_failed'];
 			}
 		}
 
-		// Parse options.
-		$attributes = array();
-		foreach ( $options as $option ) {
-			if ( strpos( $option, ':' ) !== false ) {
-				list( $key, $value )        = explode( ':', $option, 2 );
-				$attributes[ trim( $key ) ] = trim( $value, '"' );
-			}
+		$limit = isset( $attributes['limit'] ) && '' !== $attributes['limit'] ? $attributes['limit'] : Oli_CF_Uploads::DEFAULT_LIMIT;
+		$types = isset( $attributes['filetypes'] ) && '' !== $attributes['filetypes'] ? $attributes['filetypes'] : Oli_CF_Uploads::DEFAULT_FILETYPES;
+
+		$limit_bytes = Oli_CF_Uploads::parse_size( $limit );
+		$size        = isset( $file['size'] ) ? (int) $file['size'] : 0;
+
+		if ( $limit_bytes > 0 && $size > $limit_bytes ) {
+			return sprintf(
+				/* translators: %s: file size limit */
+				__( 'The uploaded file exceeds the maximum allowed size of %s.', 'oli-contact-form' ),
+				$limit
+			);
 		}
 
-		// Validate file size.
-		if ( isset( $attributes['limit'] ) ) {
-			$limit_bytes = self::parse_size( $attributes['limit'] );
-			if ( $file['size'] > $limit_bytes ) {
-				return sprintf(
-					/* translators: %s: file size limit */
-					__( 'The uploaded file exceeds the maximum allowed size of %s.', 'oli-contact-form' ),
-					$attributes['limit']
-				);
-			}
+		$allowed = Oli_CF_Uploads::parse_filetypes( $types );
+		$ext     = strtolower( pathinfo( isset( $file['name'] ) ? $file['name'] : '', PATHINFO_EXTENSION ) );
+
+		if ( in_array( $ext, Oli_CF_Uploads::BLOCKED_EXTENSIONS, true ) ) {
+			return $messages['upload_file_type'];
 		}
 
-		// Validate file type.
-		if ( isset( $attributes['filetypes'] ) ) {
-			$allowed_types = array_map( 'trim', explode( '|', $attributes['filetypes'] ) );
-			$file_ext      = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
-
-			if ( ! in_array( $file_ext, $allowed_types, true ) ) {
-				return sprintf(
-					/* translators: %s: allowed file types */
-					__( 'This file type is not allowed. Allowed types: %s', 'oli-contact-form' ),
-					implode( ', ', $allowed_types )
-				);
-			}
+		if ( ! empty( $allowed ) && ! in_array( $ext, $allowed, true ) ) {
+			return sprintf(
+				/* translators: %s: allowed file types */
+				__( 'This file type is not allowed. Allowed types: %s', 'oli-contact-form' ),
+				implode( ', ', $allowed )
+			);
 		}
 
 		return false;
-	}
-
-	/**
-	 * Parse size string to bytes.
-	 *
-	 * @param string $size Size string (e.g., "2mb", "500kb").
-	 * @return int Size in bytes.
-	 */
-	private static function parse_size( $size ) {
-		$size  = strtolower( trim( $size ) );
-		$value = intval( $size );
-
-		if ( strpos( $size, 'gb' ) !== false ) {
-			return $value * 1024 * 1024 * 1024;
-		} elseif ( strpos( $size, 'mb' ) !== false ) {
-			return $value * 1024 * 1024;
-		} elseif ( strpos( $size, 'kb' ) !== false ) {
-			return $value * 1024;
-		}
-
-		return $value;
 	}
 }

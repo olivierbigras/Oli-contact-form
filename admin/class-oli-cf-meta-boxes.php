@@ -82,10 +82,7 @@ class Oli_CF_Meta_Boxes {
 			<div class="oli-cf-tag-generator">
 				<button type="button" class="button oli-cf-tag-gen" data-tag-type="text"><?php esc_html_e( 'text', 'oli-contact-form' ); ?></button>
 				<button type="button" class="button oli-cf-tag-gen" data-tag-type="email"><?php esc_html_e( 'email', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="tel"><?php esc_html_e( 'tel', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="url"><?php esc_html_e( 'url', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="number"><?php esc_html_e( 'number', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="date"><?php esc_html_e( 'date', 'oli-contact-form' ); ?></button>
+				<button type="button" class="button oli-cf-tag-gen" data-tag-type="tel"><?php esc_html_e( 'phone', 'oli-contact-form' ); ?></button>
 				<button type="button" class="button oli-cf-tag-gen" data-tag-type="textarea"><?php esc_html_e( 'textarea', 'oli-contact-form' ); ?></button>
 				<button type="button" class="button oli-cf-tag-gen" data-tag-type="select"><?php esc_html_e( 'select', 'oli-contact-form' ); ?></button>
 				<button type="button" class="button oli-cf-tag-gen" data-tag-type="checkbox"><?php esc_html_e( 'checkbox', 'oli-contact-form' ); ?></button>
@@ -110,7 +107,7 @@ class Oli_CF_Meta_Boxes {
 	public function render_mail_settings( $post ) {
 		$mail = get_post_meta( $post->ID, '_oli_cf_mail', true );
 
-		if ( empty( $mail ) ) {
+		if ( empty( $mail ) || ! is_array( $mail ) ) {
 			$mail = $this->get_default_mail();
 		}
 		?>
@@ -157,7 +154,7 @@ class Oli_CF_Meta_Boxes {
 	public function render_mail_2_settings( $post ) {
 		$mail_2 = get_post_meta( $post->ID, '_oli_cf_mail_2', true );
 
-		if ( empty( $mail_2 ) ) {
+		if ( empty( $mail_2 ) || ! is_array( $mail_2 ) ) {
 			$mail_2 = array(
 				'enabled'            => false,
 				'to'                 => '[your-email]',
@@ -172,7 +169,7 @@ class Oli_CF_Meta_Boxes {
 		<p>
 			<label>
 				<input type="checkbox" name="oli_cf_mail_2[enabled]" value="1" <?php checked( ! empty( $mail_2['enabled'] ) ); ?> />
-				<?php esc_html_e( 'Enable autoresponder (Mail 2)', 'oli-contact-form' ); ?>
+				<?php esc_html_e( 'Enable confirmation email to the sender (Mail 2)', 'oli-contact-form' ); ?>
 			</label>
 		</p>
 		<table class="form-table">
@@ -213,25 +210,30 @@ class Oli_CF_Meta_Boxes {
 	 * @param WP_Post $post Post object.
 	 */
 	public function render_messages( $post ) {
-		$messages = get_post_meta( $post->ID, '_oli_cf_messages', true );
-
-		if ( empty( $messages ) ) {
-			$messages = $this->get_default_messages();
-		}
+		$messages = Oli_CF_Validator::normalize_messages( get_post_meta( $post->ID, '_oli_cf_messages', true ) );
+		$labels   = array(
+			'mail_sent_ok'          => __( 'Success message', 'oli-contact-form' ),
+			'mail_sent_ng'          => __( 'Mail error message', 'oli-contact-form' ),
+			'validation_error'      => __( 'Validation error (form)', 'oli-contact-form' ),
+			'invalid_required'      => __( 'Required field', 'oli-contact-form' ),
+			'invalid_email'         => __( 'Invalid email', 'oli-contact-form' ),
+			'invalid_tel'           => __( 'Invalid phone', 'oli-contact-form' ),
+			'invalid_url'           => __( 'Invalid URL', 'oli-contact-form' ),
+			'invalid_number'        => __( 'Invalid number', 'oli-contact-form' ),
+			'invalid_date'          => __( 'Invalid date', 'oli-contact-form' ),
+			'accept_terms'          => __( 'Acceptance required', 'oli-contact-form' ),
+			'upload_failed'         => __( 'Upload failed', 'oli-contact-form' ),
+			'upload_file_too_large' => __( 'File too large', 'oli-contact-form' ),
+			'upload_file_type'      => __( 'File type not allowed', 'oli-contact-form' ),
+		);
 		?>
 		<table class="form-table">
-			<tr>
-				<th><label for="oli-cf-msg-sent-ok"><?php esc_html_e( 'Success Message', 'oli-contact-form' ); ?></label></th>
-				<td><input type="text" name="oli_cf_messages[mail_sent_ok]" id="oli-cf-msg-sent-ok" value="<?php echo esc_attr( $messages['mail_sent_ok'] ); ?>" class="large-text" /></td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-msg-sent-ng"><?php esc_html_e( 'Error Message', 'oli-contact-form' ); ?></label></th>
-				<td><input type="text" name="oli_cf_messages[mail_sent_ng]" id="oli-cf-msg-sent-ng" value="<?php echo esc_attr( $messages['mail_sent_ng'] ); ?>" class="large-text" /></td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-msg-validation-error"><?php esc_html_e( 'Validation Error', 'oli-contact-form' ); ?></label></th>
-				<td><input type="text" name="oli_cf_messages[validation_error]" id="oli-cf-msg-validation-error" value="<?php echo esc_attr( $messages['validation_error'] ); ?>" class="large-text" /></td>
-			</tr>
+			<?php foreach ( $labels as $key => $label ) : ?>
+				<tr>
+					<th><label for="oli-cf-msg-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></th>
+					<td><input type="text" name="oli_cf_messages[<?php echo esc_attr( $key ); ?>]" id="oli-cf-msg-<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $messages[ $key ] ); ?>" class="large-text" /></td>
+				</tr>
+			<?php endforeach; ?>
 		</table>
 		<?php
 	}
@@ -248,7 +250,7 @@ class Oli_CF_Meta_Boxes {
 		}
 		?>
 		<p>
-			<code>[oli_contact_form id="<?php echo absint( $post->ID ); ?>"]</code>
+			<code>[oli_contact_form id="<?php echo esc_html( (string) absint( $post->ID ) ); ?>"]</code>
 		</p>
 		<p class="description">
 			<?php esc_html_e( 'Copy this shortcode and paste it into your post, page, or text widget.', 'oli-contact-form' ); ?>
@@ -263,7 +265,10 @@ class Oli_CF_Meta_Boxes {
 	 * @param WP_Post $post    Post object.
 	 */
 	public function save_form_data( $post_id, $post ) {
-		// Check nonce.
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+
 		if ( ! isset( $_POST['oli_cf_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['oli_cf_nonce'] ) ), 'oli_cf_save_form' ) ) {
 			return;
 		}
@@ -272,26 +277,22 @@ class Oli_CF_Meta_Boxes {
 			return;
 		}
 
-		// Check permissions.
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
 			return;
 		}
 
-		// Save form template.
 		if ( isset( $_POST['oli_cf_form_template'] ) ) {
 			update_post_meta( $post_id, '_oli_cf_form_template', wp_kses_post( wp_unslash( $_POST['oli_cf_form_template'] ) ) );
 		}
 
-		// Save mail settings.
-		if ( isset( $_POST['oli_cf_mail'] ) ) {
+		if ( isset( $_POST['oli_cf_mail'] ) && is_array( $_POST['oli_cf_mail'] ) ) {
 			$mail                       = array_map( 'sanitize_text_field', wp_unslash( $_POST['oli_cf_mail'] ) );
 			$mail['body']               = isset( $_POST['oli_cf_mail']['body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['oli_cf_mail']['body'] ) ) : '';
 			$mail['additional_headers'] = isset( $_POST['oli_cf_mail']['additional_headers'] ) ? sanitize_textarea_field( wp_unslash( $_POST['oli_cf_mail']['additional_headers'] ) ) : '';
 			update_post_meta( $post_id, '_oli_cf_mail', $mail );
 		}
 
-		// Save mail 2 settings.
-		if ( isset( $_POST['oli_cf_mail_2'] ) ) {
+		if ( isset( $_POST['oli_cf_mail_2'] ) && is_array( $_POST['oli_cf_mail_2'] ) ) {
 			$mail_2                       = array_map( 'sanitize_text_field', wp_unslash( $_POST['oli_cf_mail_2'] ) );
 			$mail_2['enabled']            = ! empty( $_POST['oli_cf_mail_2']['enabled'] );
 			$mail_2['body']               = isset( $_POST['oli_cf_mail_2']['body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['oli_cf_mail_2']['body'] ) ) : '';
@@ -299,10 +300,9 @@ class Oli_CF_Meta_Boxes {
 			update_post_meta( $post_id, '_oli_cf_mail_2', $mail_2 );
 		}
 
-		// Save messages.
-		if ( isset( $_POST['oli_cf_messages'] ) ) {
+		if ( isset( $_POST['oli_cf_messages'] ) && is_array( $_POST['oli_cf_messages'] ) ) {
 			$messages = array_map( 'sanitize_text_field', wp_unslash( $_POST['oli_cf_messages'] ) );
-			update_post_meta( $post_id, '_oli_cf_messages', $messages );
+			update_post_meta( $post_id, '_oli_cf_messages', Oli_CF_Validator::normalize_messages( $messages ) );
 		}
 	}
 
@@ -320,14 +320,14 @@ class Oli_CF_Meta_Boxes {
 			'    [text* your-subject] </label>' . "\n\n" .
 			'<label> ' . __( 'Your message', 'oli-contact-form' ) . "\n" .
 			'    [textarea your-message] </label>' . "\n\n" .
-			'[acceptance consent "' . __( 'I consent to having this website store my submitted information so they can respond to my inquiry.', 'oli-contact-form' ) . '"]' . "\n\n" .
+			'[acceptance consent "' . __( 'I consent to being contacted about this inquiry.', 'oli-contact-form' ) . '"]' . "\n\n" .
 			'[submit "' . __( 'Send', 'oli-contact-form' ) . '"]';
 	}
 
 	/**
 	 * Get default mail settings.
 	 *
-	 * @return array Default mail settings.
+	 * @return array<string, string>
 	 */
 	private function get_default_mail() {
 		return array(
@@ -337,19 +337,6 @@ class Oli_CF_Meta_Boxes {
 			'body'               => "From: [your-name] <[your-email]>\nSubject: [your-subject]\n\nMessage:\n[your-message]",
 			'reply_to'           => '[your-email]',
 			'additional_headers' => '',
-		);
-	}
-
-	/**
-	 * Get default messages.
-	 *
-	 * @return array Default messages.
-	 */
-	private function get_default_messages() {
-		return array(
-			'mail_sent_ok'     => __( 'Thank you for your message. It has been sent.', 'oli-contact-form' ),
-			'mail_sent_ng'     => __( 'There was an error sending your message. Please try again.', 'oli-contact-form' ),
-			'validation_error' => __( 'One or more fields have an error. Please check and try again.', 'oli-contact-form' ),
 		);
 	}
 }

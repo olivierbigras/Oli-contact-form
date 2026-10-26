@@ -40,19 +40,36 @@ class Oli_CF_Admin {
 	}
 
 	/**
-	 * Register the stylesheets for the admin area.
+	 * Whether the current admin screen belongs to this plugin.
+	 *
+	 * @return bool
 	 */
-	public function enqueue_styles() {
+	private function is_plugin_screen() {
 		$screen = get_current_screen();
+
+		if ( ! $screen ) {
+			return false;
+		}
+
+		if ( 'oli_contact_form' === $screen->post_type ) {
+			return true;
+		}
 
 		$extra_screens = array(
 			'oli_contact_form_page_oli-cf-settings',
 			'oli-contact-forms_page_oli-cf-settings',
-			'oli_contact_form_page_oli-cf-messages',
-			'oli-contact-forms_page_oli-cf-messages',
+			'oli_contact_form_page_oli-cf-import-cf7',
+			'oli-contact-forms_page_oli-cf-import-cf7',
 		);
 
-		if ( ! $screen || ( 'oli_contact_form' !== $screen->post_type && ! in_array( $screen->id, $extra_screens, true ) ) ) {
+		return in_array( $screen->id, $extra_screens, true );
+	}
+
+	/**
+	 * Register the stylesheets for the admin area.
+	 */
+	public function enqueue_styles() {
+		if ( ! $this->is_plugin_screen() ) {
 			return;
 		}
 
@@ -88,9 +105,42 @@ class Oli_CF_Admin {
 			'oliCfAdmin',
 			array(
 				'strings' => array(
-					'insert_tag' => __( 'Insert Tag', 'oli-contact-form' ),
+					'field_name'     => __( 'Enter field name (e.g., "your-name"):', 'oli-contact-form' ),
+					'required'       => __( 'Is this field required?', 'oli-contact-form' ),
+					'options'        => __( 'Enter options (separated by spaces, quote multi-word options):', 'oli-contact-form' ),
+					'acceptance'     => __( 'Enter acceptance text:', 'oli-contact-form' ),
+					'acceptance_def' => __( 'I accept the terms', 'oli-contact-form' ),
+					'file_limit'     => __( 'File size limit (e.g., "2mb"):', 'oli-contact-form' ),
+					'file_types'     => __( 'Allowed file types (e.g., "jpg|png|pdf"):', 'oli-contact-form' ),
+					'button_text'    => __( 'Button text:', 'oli-contact-form' ),
+					'send'           => __( 'Send', 'oli-contact-form' ),
 				),
 			)
 		);
+	}
+
+	/**
+	 * Show the CF7 import result on this plugin's screens only.
+	 */
+	public function maybe_import_notice() {
+		if ( ! $this->is_plugin_screen() || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! isset( $_GET['oli_cf_imported'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only status flag.
+			return;
+		}
+
+		$count = absint( wp_unslash( $_GET['oli_cf_imported'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		echo '<div class="notice notice-success is-dismissible"><p>';
+		echo esc_html(
+			sprintf(
+				/* translators: %d: number of imported forms */
+				_n( '%d form imported.', '%d forms imported.', $count, 'oli-contact-form' ),
+				$count
+			)
+		);
+		echo '</p></div>';
 	}
 }

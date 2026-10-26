@@ -13,8 +13,10 @@ global $wpdb;
 
 $table = $wpdb->prefix . 'oli_cf_messages';
 
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- uninstall drops the plugin table.
-$wpdb->query( "DROP TABLE IF EXISTS {$table}" );
+if ( preg_match( '/^[A-Za-z0-9_]+$/', $table ) ) {
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- uninstall drops a leftover table from older versions that stored copies.
+	$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $table ) );
+}
 
 delete_option( 'oli_cf_settings' );
 delete_option( 'oli_cf_db_version' );

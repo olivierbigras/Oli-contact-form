@@ -6,10 +6,13 @@
 (function($) {
 	'use strict';
 
+	function escapeHtml(value) {
+		return $('<div>').text(value == null ? '' : String(value)).html();
+	}
+
 	var OliContactForm = {
 		init: function() {
 			this.bindEvents();
-			this.initRecaptcha();
 		},
 
 		bindEvents: function() {
@@ -20,7 +23,6 @@
 				self.handleSubmit($(this));
 			});
 
-			// Client-side validation on blur
 			$(document).on('blur', '.oli-cf-field', function() {
 				self.validateField($(this));
 			});
@@ -32,11 +34,10 @@
 			var $container = $form.closest('.oli-cf-container');
 			var $output = $container.find('.oli-cf-response-output');
 			var $submit = $form.find('.oli-cf-submit');
+			var strings = (window.oliCf && oliCf.strings) ? oliCf.strings : {};
 
-			// Clear previous messages
 			$output.empty();
 
-			// Validate all fields
 			var isValid = true;
 			$form.find('.oli-cf-field').each(function() {
 				if (!self.validateField($(this))) {
@@ -45,17 +46,15 @@
 			});
 
 			if (!isValid) {
-				$output.html('<div class="oli-cf-response-error" role="alert">' + 
-					'One or more fields have an error. Please check and try again.' + 
+				$output.html('<div class="oli-cf-response-error" role="alert">' +
+					escapeHtml(strings.validationError || 'One or more fields have an error. Please check and try again.') +
 					'</div>');
 				return false;
 			}
 
-			// Disable submit button
 			$submit.prop('disabled', true).append('<span class="oli-cf-spinner"></span>');
 
-			// Handle reCAPTCHA if enabled
-			if (oliCf.recaptchaSiteKey) {
+			if (window.oliCf && oliCf.recaptchaSiteKey && window.grecaptcha) {
 				grecaptcha.ready(function() {
 					grecaptcha.execute(oliCf.recaptchaSiteKey, {action: 'submit'}).then(function(token) {
 						$form.find('#oli-cf-recaptcha-' + formId).val(token);
@@ -71,8 +70,10 @@
 
 		submitForm: function($form, $container, $output, $submit) {
 			var formData = new FormData($form[0]);
+			var strings = (window.oliCf && oliCf.strings) ? oliCf.strings : {};
+
 			formData.append('action', 'oli_cf_submit_form');
-			formData.append('nonce', oliCf.nonce || wp.ajax.settings.nonce);
+			formData.append('nonce', (window.oliCf && oliCf.nonce) ? oliCf.nonce : '');
 
 			$.ajax({
 				url: oliCf.ajaxUrl,
@@ -84,20 +85,20 @@
 					$submit.prop('disabled', false).find('.oli-cf-spinner').remove();
 
 					if (response.success) {
-						$output.html('<div class="oli-cf-response-success" role="alert">' + 
-							response.data.message + 
+						$output.html('<div class="oli-cf-response-success" role="alert">' +
+							escapeHtml(response.data.message) +
 							'</div>');
 						$form[0].reset();
 						$form.find('.oli-cf-field').removeClass('oli-cf-invalid').attr('aria-invalid', 'false');
 					} else {
-						var errorHtml = '<div class="oli-cf-response-error" role="alert">' + 
-							response.data.message;
+						var errorHtml = '<div class="oli-cf-response-error" role="alert">' +
+							escapeHtml(response.data && response.data.message ? response.data.message : strings.unexpectedError);
 
-						if (response.data.errors) {
+						if (response.data && response.data.errors) {
 							errorHtml += '<ul class="oli-cf-validation-errors">';
 							$.each(response.data.errors, function(field, error) {
-								errorHtml += '<li>' + error + '</li>';
-								$form.find('[name="' + field + '"]').addClass('oli-cf-invalid').attr('aria-invalid', 'true');
+								errorHtml += '<li>' + escapeHtml(error) + '</li>';
+								$form.find('[name="' + field + '"], [name="' + field + '[]"]').addClass('oli-cf-invalid').attr('aria-invalid', 'true');
 							});
 							errorHtml += '</ul>';
 						}
@@ -106,15 +107,14 @@
 						$output.html(errorHtml);
 					}
 
-					// Scroll to message
 					$('html, body').animate({
 						scrollTop: $container.offset().top - 50
 					}, 300);
 				},
 				error: function() {
 					$submit.prop('disabled', false).find('.oli-cf-spinner').remove();
-					$output.html('<div class="oli-cf-response-error" role="alert">' + 
-						'An unexpected error occurred. Please try again.' + 
+					$output.html('<div class="oli-cf-response-error" role="alert">' +
+						escapeHtml(strings.unexpectedError || 'An unexpected error occurred. Please try again.') +
 						'</div>');
 				}
 			});
@@ -126,34 +126,28 @@
 			var required = $field.prop('required');
 			var isValid = true;
 
-			// Clear previous error state
 			$field.removeClass('oli-cf-invalid').attr('aria-invalid', 'false');
 
-			// Required check
 			if (required && (!value || value.length === 0)) {
 				isValid = false;
 			}
 
-			// Type-specific validation
 			if (value && value.length > 0) {
 				switch (type) {
 					case 'email':
-						var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-						if (!emailRegex.test(value)) {
+						if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
 							isValid = false;
 						}
 						break;
 
 					case 'url':
-						var urlRegex = /^https?:\/\/.+/;
-						if (!urlRegex.test(value)) {
+						if (!/^https?:\/\/.+/.test(value)) {
 							isValid = false;
 						}
 						break;
 
 					case 'tel':
-						var telRegex = /^[\d\s\+\-\(\)]+$/;
-						if (!telRegex.test(value)) {
+						if (!/^[\d\s\+\-\(\)]+$/.test(value)) {
 							isValid = false;
 						}
 						break;
@@ -171,20 +165,14 @@
 			}
 
 			return isValid;
-		},
-
-		initRecaptcha: function() {
-			// reCAPTCHA is initialized via the Google API script
-			// Turnstile is initialized via data attributes
 		}
 	};
 
-	// Initialize on document ready
 	$(document).ready(function() {
 		OliContactForm.init();
 	});
 
-	// Expose to global scope if needed
 	window.OliContactForm = OliContactForm;
+	window.oliCfTurnstileCallback = function() {};
 
 })(jQuery);

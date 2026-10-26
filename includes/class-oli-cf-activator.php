@@ -18,21 +18,19 @@ class Oli_CF_Activator {
 	 * Activate the plugin.
 	 */
 	public static function activate() {
-		// Flush rewrite rules to register custom post type.
 		flush_rewrite_rules();
 
-		require_once plugin_dir_path( __FILE__ ) . 'class-oli-cf-message-store.php';
+		require_once plugin_dir_path( __DIR__ ) . 'admin/class-oli-cf-settings.php';
 
-		Oli_CF_Message_Store::maybe_install();
-		Oli_CF_Message_Store::schedule_cron();
-
-		$defaults = Oli_CF_Message_Store::get_settings();
+		$defaults = Oli_CF_Settings::get_defaults();
 		$current  = get_option( 'oli_cf_settings', false );
 
 		if ( false === $current || ! is_array( $current ) ) {
 			add_option( 'oli_cf_settings', $defaults );
-		} else {
-			update_option( 'oli_cf_settings', wp_parse_args( $current, $defaults ) );
+			return;
 		}
+
+		unset( $current['store_messages'], $current['retention_days'] );
+		update_option( 'oli_cf_settings', wp_parse_args( $current, $defaults ) );
 	}
 }

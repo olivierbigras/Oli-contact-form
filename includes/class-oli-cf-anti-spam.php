@@ -17,11 +17,14 @@ class Oli_CF_Anti_Spam {
 	/**
 	 * Check if submission passes anti-spam tests.
 	 *
-	 * @param array $data Posted data.
-	 * @return array|bool True if valid, array with error message if spam.
+	 * @param array<string, mixed> $data Posted data.
+	 * @return array<string, string>|true True if valid, array with error message if spam.
 	 */
 	public static function check( $data ) {
-		// Honeypot check.
+		if ( ! is_array( $data ) ) {
+			$data = array();
+		}
+
 		if ( ! empty( $data['oli_cf_hp'] ) ) {
 			return array(
 				'type'    => 'spam',
@@ -29,32 +32,23 @@ class Oli_CF_Anti_Spam {
 			);
 		}
 
-		// Time trap check (form must take at least 3 seconds to submit).
-		if ( ! empty( $data['oli_cf_timestamp'] ) ) {
-			$timestamp = intval( $data['oli_cf_timestamp'] );
-			$elapsed   = time() - $timestamp;
-
-			if ( $elapsed < 3 ) {
-				return array(
-					'type'    => 'spam',
-					'message' => __( 'Form submitted too quickly.', 'oli-contact-form' ),
-				);
-			}
-		}
-
-		// Check reCAPTCHA v3 if enabled.
 		$settings = get_option( 'oli_cf_settings', array() );
+
+		if ( ! is_array( $settings ) ) {
+			$settings = array();
+		}
 
 		if ( ! empty( $settings['recaptcha_enabled'] ) && ! empty( $settings['recaptcha_secret_key'] ) ) {
 			$recaptcha_result = self::verify_recaptcha( $data, $settings['recaptcha_secret_key'] );
+
 			if ( is_array( $recaptcha_result ) ) {
 				return $recaptcha_result;
 			}
 		}
 
-		// Check Cloudflare Turnstile if enabled.
 		if ( ! empty( $settings['turnstile_enabled'] ) && ! empty( $settings['turnstile_secret_key'] ) ) {
 			$turnstile_result = self::verify_turnstile( $data, $settings['turnstile_secret_key'] );
+
 			if ( is_array( $turnstile_result ) ) {
 				return $turnstile_result;
 			}
@@ -66,9 +60,9 @@ class Oli_CF_Anti_Spam {
 	/**
 	 * Verify Google reCAPTCHA v3 response.
 	 *
-	 * @param array  $data       Posted data.
-	 * @param string $secret_key reCAPTCHA secret key.
-	 * @return array|bool True if valid, array with error if failed.
+	 * @param array<string, mixed> $data       Posted data.
+	 * @param string               $secret_key reCAPTCHA secret key.
+	 * @return array<string, string>|true True if valid, array with error if failed.
 	 */
 	private static function verify_recaptcha( $data, $secret_key ) {
 		if ( empty( $data['g-recaptcha-response'] ) ) {
@@ -101,7 +95,7 @@ class Oli_CF_Anti_Spam {
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( empty( $body['success'] ) || $body['score'] < 0.5 ) {
+		if ( empty( $body['success'] ) || ! isset( $body['score'] ) || $body['score'] < 0.5 ) {
 			return array(
 				'type'    => 'spam',
 				'message' => __( 'Spam detected by reCAPTCHA.', 'oli-contact-form' ),
@@ -114,9 +108,9 @@ class Oli_CF_Anti_Spam {
 	/**
 	 * Verify Cloudflare Turnstile response.
 	 *
-	 * @param array  $data       Posted data.
-	 * @param string $secret_key Turnstile secret key.
-	 * @return array|bool True if valid, array with error if failed.
+	 * @param array<string, mixed> $data       Posted data.
+	 * @param string               $secret_key Turnstile secret key.
+	 * @return array<string, string>|true True if valid, array with error if failed.
 	 */
 	private static function verify_turnstile( $data, $secret_key ) {
 		if ( empty( $data['cf-turnstile-response'] ) ) {
@@ -165,16 +159,12 @@ class Oli_CF_Anti_Spam {
 	 * @return string IP address.
 	 */
 	private static function get_client_ip() {
-		$ip = '';
-
-		if ( ! empty( $_SERVER['HTTP_CLIENT_IP'] ) ) {
-			$ip = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CLIENT_IP'] ) );
-		} elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$ip = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) );
-		} elseif ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
-			$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+		if ( empty( $_SERVER['REMOTE_ADDR'] ) ) {
+			return '';
 		}
 
-		return $ip;
+		$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+
+		return filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '';
 	}
 }

@@ -20,8 +20,8 @@ class Oli_CF_Shortcode {
 	public function register_shortcode() {
 		add_shortcode( 'oli_contact_form', array( $this, 'render_shortcode' ) );
 
-		// Add CF7 compatibility shortcode if enabled.
 		$settings = get_option( 'oli_cf_settings', array() );
+
 		if ( ! empty( $settings['cf7_compat_enabled'] ) ) {
 			add_shortcode( 'contact-form-7', array( $this, 'render_cf7_compat_shortcode' ) );
 		}
@@ -30,7 +30,7 @@ class Oli_CF_Shortcode {
 	/**
 	 * Render shortcode.
 	 *
-	 * @param array $atts Shortcode attributes.
+	 * @param array<string, mixed> $atts Shortcode attributes.
 	 * @return string Form HTML.
 	 */
 	public function render_shortcode( $atts ) {
@@ -54,7 +54,7 @@ class Oli_CF_Shortcode {
 	/**
 	 * Render CF7 compatibility shortcode.
 	 *
-	 * @param array $atts Shortcode attributes.
+	 * @param array<string, mixed> $atts Shortcode attributes.
 	 * @return string Form HTML.
 	 */
 	public function render_cf7_compat_shortcode( $atts ) {
@@ -72,21 +72,20 @@ class Oli_CF_Shortcode {
 			return '';
 		}
 
-		// Find imported form.
-		$args = array(
-			'post_type'      => 'oli_contact_form',
-			'posts_per_page' => 1,
-			'post_status'    => 'publish',
-			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- one published form by imported CF7 ID.
-			'meta_query'     => array(
-				array(
-					'key'   => '_oli_cf_imported_from_cf7',
-					'value' => $cf7_form_id,
+		$forms = get_posts(
+			array(
+				'post_type'      => 'oli_contact_form',
+				'posts_per_page' => 1,
+				'post_status'    => 'publish',
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- one published form by imported CF7 ID.
+				'meta_query'     => array(
+					array(
+						'key'   => '_oli_cf_imported_from_cf7',
+						'value' => $cf7_form_id,
+					),
 				),
-			),
+			)
 		);
-
-		$forms = get_posts( $args );
 
 		if ( empty( $forms ) ) {
 			return '';
@@ -121,22 +120,26 @@ class Oli_CF_Shortcode {
 		$status_nonce    = isset( $_GET['oli_cf_status_nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['oli_cf_status_nonce'] ) ) : '';
 
 		if ( wp_verify_nonce( $status_nonce, 'oli_cf_status_' . $form_id ) ) {
+			$messages = Oli_CF_Validator::normalize_messages( get_post_meta( $form_id, '_oli_cf_messages', true ) );
+
 			if ( isset( $_GET['oli_cf_success'] ) && absint( wp_unslash( $_GET['oli_cf_success'] ) ) === $form_id ) {
-				$messages        = get_post_meta( $form_id, '_oli_cf_messages', true );
-				$success_message = ! empty( $messages['mail_sent_ok'] ) ? $messages['mail_sent_ok'] : __( 'Thank you for your message. It has been sent.', 'oli-contact-form' );
+				$success_message = $messages['mail_sent_ok'];
 			}
 
 			if ( isset( $_GET['oli_cf_error'] ) && absint( wp_unslash( $_GET['oli_cf_error'] ) ) === $form_id ) {
-				$messages      = get_post_meta( $form_id, '_oli_cf_messages', true );
-				$error_message = ! empty( $messages['mail_sent_ng'] ) ? $messages['mail_sent_ng'] : __( 'There was an error sending your message. Please try again.', 'oli-contact-form' );
+				$error_message = $messages['mail_sent_ng'];
 			}
 		}
 
 		$settings = get_option( 'oli_cf_settings', array() );
 
+		if ( ! is_array( $settings ) ) {
+			$settings = array();
+		}
+
 		ob_start();
 		?>
-		<div class="oli-cf-container" id="oli-cf-container-<?php echo absint( $form_id ); ?>">
+		<div class="oli-cf-container" id="oli-cf-container-<?php echo esc_attr( (string) absint( $form_id ) ); ?>">
 			<div class="oli-cf-response-output" aria-live="polite" role="status">
 				<?php if ( $success_message ) : ?>
 					<div class="oli-cf-response-success"><?php echo esc_html( $success_message ); ?></div>
@@ -146,27 +149,22 @@ class Oli_CF_Shortcode {
 				<?php endif; ?>
 			</div>
 
-			<form class="oli-cf-form" id="oli-cf-form-<?php echo absint( $form_id ); ?>" method="post" enctype="multipart/form-data" novalidate="novalidate">
+			<form class="oli-cf-form" id="oli-cf-form-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" method="post" enctype="multipart/form-data" novalidate="novalidate">
 				<?php wp_nonce_field( 'oli_cf_submit_' . $form_id, 'oli_cf_nonce' ); ?>
-				<input type="hidden" name="oli_cf_form_id" value="<?php echo absint( $form_id ); ?>" />
-				<input type="hidden" name="oli_cf_timestamp" value="<?php echo esc_attr( time() ); ?>" />
+				<input type="hidden" name="oli_cf_form_id" value="<?php echo esc_attr( (string) absint( $form_id ) ); ?>" />
+				<input type="hidden" name="form_id" value="<?php echo esc_attr( (string) absint( $form_id ) ); ?>" />
 
 				<div class="oli-cf-honeypot" aria-hidden="true">
-					<input type="text" name="oli_cf_hp" value="" tabindex="-1" autocomplete="off" />
+					<label for="oli-cf-hp-<?php echo esc_attr( (string) absint( $form_id ) ); ?>"><?php esc_html_e( 'Leave this field empty', 'oli-contact-form' ); ?></label>
+					<input type="text" name="oli_cf_hp" id="oli-cf-hp-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" value="" tabindex="-1" autocomplete="off" />
 				</div>
 
-				<?php
-				// Parse and render form.
-				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-				echo Oli_CF_Form_Parser::parse( $template, $form_id );
-				?>
+				<?php echo Oli_CF_Form_Parser::parse( $template, $form_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- parse() runs wp_kses(). ?>
 
-				<!-- reCAPTCHA v3 container -->
 				<?php if ( ! empty( $settings['recaptcha_enabled'] ) && ! empty( $settings['recaptcha_site_key'] ) ) : ?>
-					<input type="hidden" name="g-recaptcha-response" id="oli-cf-recaptcha-<?php echo absint( $form_id ); ?>" />
+					<input type="hidden" name="g-recaptcha-response" id="oli-cf-recaptcha-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" />
 				<?php endif; ?>
 
-				<!-- Turnstile container -->
 				<?php if ( ! empty( $settings['turnstile_enabled'] ) && ! empty( $settings['turnstile_site_key'] ) ) : ?>
 					<div class="cf-turnstile" data-sitekey="<?php echo esc_attr( $settings['turnstile_site_key'] ); ?>" data-callback="oliCfTurnstileCallback"></div>
 				<?php endif; ?>
