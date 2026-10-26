@@ -111,6 +111,123 @@ class Oli_CF_Mailer {
 	}
 
 	/**
+	 * Sanitize posted mail settings while keeping <[field]> and <email> intact.
+	 *
+	 * @param mixed $posted    Posted mail array (already unslashed).
+	 * @param bool  $is_mail_2 Whether this is Mail 2.
+	 * @return array<string, mixed>
+	 */
+	public static function sanitize_mail_settings( $posted, $is_mail_2 = false ) {
+		if ( ! is_array( $posted ) ) {
+			$posted = array();
+		}
+
+		$mail = array(
+			'to'                 => self::sanitize_mail_line( isset( $posted['to'] ) ? $posted['to'] : '' ),
+			'from'               => self::sanitize_mail_line( isset( $posted['from'] ) ? $posted['from'] : '' ),
+			'subject'            => self::sanitize_mail_line( isset( $posted['subject'] ) ? $posted['subject'] : '' ),
+			'body'               => self::sanitize_mail_body( isset( $posted['body'] ) ? $posted['body'] : '' ),
+			'reply_to'           => self::sanitize_mail_line( isset( $posted['reply_to'] ) ? $posted['reply_to'] : '' ),
+			'additional_headers' => self::sanitize_mail_headers( isset( $posted['additional_headers'] ) ? $posted['additional_headers'] : '' ),
+		);
+
+		if ( $is_mail_2 ) {
+			$mail['enabled'] = ! empty( $posted['enabled'] );
+		}
+
+		return self::normalize_mail( $mail, $is_mail_2 );
+	}
+
+	/**
+	 * Sanitize a single-line mail field (To, From, Subject, Reply-To).
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_mail_line( $value ) {
+		$value = str_replace( "\0", '', (string) $value );
+
+		return self::sanitize_mail_text( self::sanitize_header_value( $value ), false );
+	}
+
+	/**
+	 * Sanitize a mail body. Newlines are kept; HTML tags are stripped.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_mail_body( $value ) {
+		return self::sanitize_mail_text( $value, true );
+	}
+
+	/**
+	 * Sanitize an Additional Headers block. One header per line; no CR/LF inside a line.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_mail_headers( $value ) {
+		$value = self::sanitize_mail_text( $value, true );
+		$lines = preg_split( '/\r\n|\r|\n/', $value );
+		$clean = array();
+
+		if ( ! is_array( $lines ) ) {
+			return '';
+		}
+
+		foreach ( $lines as $line ) {
+			$line = self::sanitize_header_value( $line );
+
+			if ( '' !== $line ) {
+				$clean[] = $line;
+			}
+		}
+
+		return implode( "\n", $clean );
+	}
+
+	/**
+	 * Strip executable HTML but keep <[field-tag]> and <user@example.com>.
+	 *
+	 * @param mixed $value          Raw value.
+	 * @param bool  $allow_newlines Whether to keep newlines.
+	 * @return string
+	 */
+	public static function sanitize_mail_text( $value, $allow_newlines = true ) {
+		$value = str_replace( "\0", '', (string) $value );
+
+		$tokens = array();
+		$value  = preg_replace_callback(
+			'/<(\[[a-zA-Z0-9._-]+\]|[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})>/',
+			function ( $matches ) use ( &$tokens ) {
+				$key            = "\x01OLI" . count( $tokens ) . "\x01";
+				$tokens[ $key ] = '<' . $matches[1] . '>';
+
+				return $key;
+			},
+			$value
+		);
+
+		if ( ! is_string( $value ) ) {
+			$value = '';
+		}
+
+		$stripped = preg_replace( '@<(script|style)[^>]*?>.*?</\\1>@si', '', $value );
+		$value    = wp_strip_all_tags( is_string( $stripped ) ? $stripped : $value );
+
+		foreach ( $tokens as $key => $original ) {
+			$value = str_replace( $key, $original, $value );
+		}
+
+		if ( ! $allow_newlines ) {
+			$value = preg_replace( '/[\r\n]+/', ' ', $value );
+			$value = is_string( $value ) ? $value : '';
+		}
+
+		return trim( $value );
+	}
+
+	/**
 	 * Build a mail payload without sending.
 	 *
 	 * @param array<string, mixed> $settings    Mail settings.

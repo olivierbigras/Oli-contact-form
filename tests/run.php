@@ -12,6 +12,7 @@ $tests = array(
 	__DIR__ . '/test-cf7-import.php',
 	__DIR__ . '/test-anti-spam.php',
 	__DIR__ . '/test-front.php',
+	__DIR__ . '/MailSanitizeTest.php',
 );
 
 $failed = 0;
@@ -19,6 +20,23 @@ $failed = 0;
 foreach ( $tests as $test ) {
 	echo "=== " . basename( $test ) . " ===\n";
 	passthru( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( $test ), $code );
+	echo "\n";
+
+	if ( 0 !== (int) $code ) {
+		++$failed;
+	}
+}
+
+$phpunit = '';
+
+if ( function_exists( 'shell_exec' ) ) {
+	$found_phpunit = shell_exec( 'command -v phpunit 2>/dev/null' );
+	$phpunit       = is_string( $found_phpunit ) ? trim( $found_phpunit ) : '';
+}
+
+if ( '' !== $phpunit ) {
+	echo "=== phpunit MailSanitizeTest ===\n";
+	passthru( escapeshellarg( $phpunit ) . ' -c ' . escapeshellarg( dirname( __DIR__ ) . '/phpunit.xml.dist' ), $code );
 	echo "\n";
 
 	if ( 0 !== (int) $code ) {

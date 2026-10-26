@@ -272,17 +272,14 @@ class Oli_CF_Meta_Boxes {
 		}
 
 		if ( isset( $_POST['oli_cf_mail'] ) && is_array( $_POST['oli_cf_mail'] ) ) {
-			$mail                       = array_map( 'sanitize_text_field', wp_unslash( $_POST['oli_cf_mail'] ) );
-			$mail['body']               = isset( $_POST['oli_cf_mail']['body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['oli_cf_mail']['body'] ) ) : '';
-			$mail['additional_headers'] = isset( $_POST['oli_cf_mail']['additional_headers'] ) ? sanitize_textarea_field( wp_unslash( $_POST['oli_cf_mail']['additional_headers'] ) ) : '';
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Oli_CF_Mailer::sanitize_mail_settings() strips HTML and keeps <[tag]>/emails.
+			$mail = Oli_CF_Mailer::sanitize_mail_settings( wp_unslash( $_POST['oli_cf_mail'] ) );
 			update_post_meta( $post_id, '_oli_cf_mail', $mail );
 		}
 
 		if ( isset( $_POST['oli_cf_mail_2'] ) && is_array( $_POST['oli_cf_mail_2'] ) ) {
-			$mail_2                       = array_map( 'sanitize_text_field', wp_unslash( $_POST['oli_cf_mail_2'] ) );
-			$mail_2['enabled']            = ! empty( $_POST['oli_cf_mail_2']['enabled'] );
-			$mail_2['body']               = isset( $_POST['oli_cf_mail_2']['body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['oli_cf_mail_2']['body'] ) ) : '';
-			$mail_2['additional_headers'] = isset( $_POST['oli_cf_mail_2']['additional_headers'] ) ? sanitize_textarea_field( wp_unslash( $_POST['oli_cf_mail_2']['additional_headers'] ) ) : '';
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Oli_CF_Mailer::sanitize_mail_settings() strips HTML and keeps <[tag]>/emails.
+			$mail_2 = Oli_CF_Mailer::sanitize_mail_settings( wp_unslash( $_POST['oli_cf_mail_2'] ), true );
 			update_post_meta( $post_id, '_oli_cf_mail_2', $mail_2 );
 		}
 

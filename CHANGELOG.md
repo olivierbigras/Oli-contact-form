@@ -5,6 +5,11 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.7] - 2026-10-26
+
+### Fixed
+- Saving mail settings used `sanitize_textarea_field` / `sanitize_text_field`, which stripped `<[your-email]>` from the default body (`From: [your-name] <[your-email]>`). Mail body, From, Reply-To, To, Subject, and Additional headers now keep `<[field]>` and `<user@example.com>`, strip real HTML, drop null bytes, and remove CR/LF from single-line headers.
+
 ## [0.3.6] - 2026-10-26
 
 ### Fixed

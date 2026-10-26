@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.6
+Stable tag: 0.3.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -131,6 +131,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 == Changelog ==
 
+= 0.3.7 =
+* Saving mail settings keeps angle brackets around field tags and email addresses (From: [your-name] <[your-email]>). Real HTML tags are stripped. Single-line headers still drop CR/LF.
+
 = 0.3.6 =
 * Translation fixes: block editor script translations, translatable default emails, regenerated POT.
 
@@ -193,6 +196,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.7 =
+Saving a form no longer strips <[your-email]> from the default notification body.
 
 = 0.3.6 =
 Translation fixes: block editor script translations, translatable default emails, regenerated POT.
