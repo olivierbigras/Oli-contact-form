@@ -373,6 +373,103 @@ class Oli_CF_Form_Parser {
 	}
 
 	/**
+	 * Visible labels keyed by field name, for error summaries.
+	 *
+	 * Prefers wrapping <label> text, then acceptance values, then placeholder,
+	 * then a humanized field name.
+	 *
+	 * @param string $template Form template.
+	 * @return array<string, string>
+	 */
+	public static function field_labels( $template ) {
+		$labels     = array();
+		$normalized = self::normalize_template( $template );
+
+		if ( preg_match_all( '/<label\b[^>]*>(.*?)<\/label>/is', $normalized, $blocks ) ) {
+			foreach ( $blocks[1] as $inner ) {
+				if ( ! preg_match( '/\[([^\]]+)\]/', $inner, $tag ) ) {
+					continue;
+				}
+
+				$field = self::parse_tag( $tag[1] );
+
+				if ( empty( $field['name'] ) ) {
+					continue;
+				}
+
+				$text = wp_strip_all_tags( preg_replace( '/\[[^\]]+\]/', '', $inner ) );
+				$text = trim( preg_replace( '/\s+/', ' ', str_replace( '*', '', (string) $text ) ) );
+
+				if ( '' !== $text ) {
+					$labels[ $field['name'] ] = $text;
+				}
+			}
+		}
+
+		foreach ( self::parse_fields( $normalized ) as $field ) {
+			if ( empty( $field['name'] ) || isset( $labels[ $field['name'] ] ) ) {
+				continue;
+			}
+
+			if ( 'acceptance' === $field['type'] && ! empty( $field['values'] ) ) {
+				$labels[ $field['name'] ] = implode( ' ', $field['values'] );
+				continue;
+			}
+
+			if ( ! empty( $field['attributes']['placeholder'] ) ) {
+				$labels[ $field['name'] ] = $field['attributes']['placeholder'];
+				continue;
+			}
+
+			$labels[ $field['name'] ] = self::humanize_field_name( $field['name'] );
+		}
+
+		return $labels;
+	}
+
+	/**
+	 * Turn a field name such as your-email into a readable label.
+	 *
+	 * @param string $name Field name.
+	 * @return string
+	 */
+	public static function humanize_field_name( $name ) {
+		$name = trim( preg_replace( '/\s+/', ' ', str_replace( array( '-', '_' ), ' ', (string) $name ) ) );
+
+		if ( '' === $name ) {
+			return '';
+		}
+
+		if ( function_exists( 'mb_convert_case' ) ) {
+			return mb_convert_case( $name, MB_CASE_TITLE, 'UTF-8' );
+		}
+
+		return ucwords( $name );
+	}
+
+	/**
+	 * JS-style error summary line: "Label : message".
+	 *
+	 * @param string $label   Field label.
+	 * @param string $message Error message.
+	 * @return string
+	 */
+	public static function format_error_summary_item( $label, $message ) {
+		$label   = trim( (string) $label );
+		$message = trim( (string) $message );
+
+		if ( '' === $label ) {
+			return $message;
+		}
+
+		if ( '' === $message ) {
+			return $label;
+		}
+
+		return $label . ' : ' . $message;
+	}
+
+	/**
 	 * Insert a required-field asterisk into labels that wrap a required input.
 	 *
 	 * @param string $html Rendered HTML.

@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.3
+Stable tag: 0.3.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -129,6 +129,11 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 == Changelog ==
 
+= 0.3.4 =
+* No-JS status return now hashes #oli-cf-response-{id} (the banner has that id, tabindex="-1"). Without a status the hash stays #oli-cf-form-{id}.
+* No-JS error summary links prefix the field label (Label : message), like the JS summary.
+* Field border #8c8f94 uses a more specific selector so Storefront and Twenty Twenty-Five do not override it.
+
 = 0.3.3 =
 * AJAX success and error banners show again: handleAjaxResponse now binds `this` instead of window.self.
 * The submit button and spinner reset after success, validation errors, and network failures.
@@ -180,6 +185,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.4 =
+No-JS status returns land on the message banner. Field borders keep #8c8f94 under common themes.
 
 = 0.3.3 =
 Fixes the AJAX banner crash (self is undefined). Imported CF7 acceptance fields are required unless they use the optional option.

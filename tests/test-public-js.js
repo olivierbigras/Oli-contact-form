@@ -198,12 +198,21 @@ const oliCf = {
 const sandbox = {
 	jQuery: jqueryStub,
 	oliCf: oliCf,
-	window: { oliCf: oliCf },
-	document: { ready: function () {} },
+	window: { oliCf: oliCf, location: { hash: '' } },
+	document: {
+		ready: function () {},
+		readyState: 'complete',
+		addEventListener: function () {},
+		getElementById: function () {
+			return null;
+		},
+	},
+	location: { hash: '' },
 	console: console,
 };
 
 sandbox.window.window = sandbox.window;
+sandbox.window.document = sandbox.document;
 sandbox.global = sandbox;
 jqueryStub.fn = {};
 

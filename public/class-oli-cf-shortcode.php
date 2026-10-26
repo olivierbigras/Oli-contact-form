@@ -197,6 +197,7 @@ class Oli_CF_Shortcode {
 		}
 
 		$form_messages = Oli_CF_Validator::normalize_messages( get_post_meta( $form_id, '_oli_cf_messages', true ) );
+		$field_labels  = Oli_CF_Form_Parser::field_labels( $template );
 		$has_status    = ( '' !== $success_message || '' !== $error_message );
 		$has_required  = Oli_CF_Form_Parser::template_has_required( $template );
 		$redirect_to   = self::current_page_url();
@@ -204,7 +205,7 @@ class Oli_CF_Shortcode {
 		ob_start();
 		?>
 		<div class="oli-cf-container<?php echo $has_status ? ' oli-cf-has-status' : ''; ?>" id="oli-cf-container-<?php echo esc_attr( (string) absint( $form_id ) ); ?>">
-			<div class="oli-cf-response-output" tabindex="-1" aria-live="polite" role="<?php echo $error_message ? 'alert' : 'status'; ?>">
+			<div class="oli-cf-response-output" id="oli-cf-response-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" tabindex="-1" aria-live="polite" role="<?php echo $error_message ? 'alert' : 'status'; ?>">
 				<?php if ( $success_message ) : ?>
 					<div class="oli-cf-response-success"><?php echo esc_html( $success_message ); ?></div>
 				<?php endif; ?>
@@ -214,7 +215,11 @@ class Oli_CF_Shortcode {
 						<?php if ( ! empty( $field_state['errors'] ) ) : ?>
 							<ul class="oli-cf-validation-errors">
 								<?php foreach ( $field_state['errors'] as $error_field => $error_text ) : ?>
-									<li><a href="#oli-cf-<?php echo esc_attr( (string) absint( $form_id ) ); ?>-<?php echo esc_attr( sanitize_key( (string) $error_field ) ); ?>"><?php echo esc_html( (string) $error_text ); ?></a></li>
+									<?php
+									$error_label = isset( $field_labels[ $error_field ] ) ? $field_labels[ $error_field ] : Oli_CF_Form_Parser::humanize_field_name( (string) $error_field );
+									$error_item  = Oli_CF_Form_Parser::format_error_summary_item( $error_label, (string) $error_text );
+									?>
+									<li><a href="#oli-cf-<?php echo esc_attr( (string) absint( $form_id ) ); ?>-<?php echo esc_attr( sanitize_key( (string) $error_field ) ); ?>"><?php echo esc_html( $error_item ); ?></a></li>
 								<?php endforeach; ?>
 							</ul>
 						<?php endif; ?>

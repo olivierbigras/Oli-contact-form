@@ -34,7 +34,6 @@
 .oli-cf-field {
 	width: 100%;
 	padding: 8px 12px;
-	border: 1px solid #8c8f94;
 	border-radius: 4px;
 	font-size: 16px;
 	font-family: inherit;
@@ -42,11 +41,24 @@
 	transition: border-color 0.2s;
 }
 
-.oli-cf-field:focus {
+.oli-cf-form .oli-cf-field,
+.oli-cf-form input.oli-cf-field,
+.oli-cf-form textarea.oli-cf-field,
+.oli-cf-form select.oli-cf-field {
+	border: 1px solid #8c8f94;
+}
+
+.oli-cf-form .oli-cf-field:focus,
+.oli-cf-form input.oli-cf-field:focus,
+.oli-cf-form textarea.oli-cf-field:focus,
+.oli-cf-form select.oli-cf-field:focus {
 	border-color: #0073aa;
 }
 
-.oli-cf-field:focus-visible {
+.oli-cf-form .oli-cf-field:focus-visible,
+.oli-cf-form input.oli-cf-field:focus-visible,
+.oli-cf-form textarea.oli-cf-field:focus-visible,
+.oli-cf-form select.oli-cf-field:focus-visible {
 	outline: 2px solid #0073aa;
 	outline-offset: 2px;
 }

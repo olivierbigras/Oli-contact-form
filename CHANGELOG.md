@@ -5,6 +5,13 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-10-26
+
+### Fixed
+- No-JS redirects with a status now hash `#oli-cf-response-{id}` (the banner has that id and `tabindex="-1"`). Without a status the hash stays `#oli-cf-form-{id}`. A tiny no-dependency script focuses the banner when JS is on; the fragment works without JS.
+- No-JS error summary links prefix the field label (`Label : message`), matching the JS summary.
+- Field border `#8c8f94` uses `.oli-cf-form .oli-cf-field` / `input.oli-cf-field` so Storefront and Twenty Twenty-Five do not win on `input[type=text]`.
+
 ## [0.3.3] - 2026-10-26
 
 ### Fixed

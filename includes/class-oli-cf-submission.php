@@ -78,7 +78,7 @@ class Oli_CF_Submission {
 		$result = $this->process_submission( $form_id, wp_unslash( $_POST ), $this->normalize_files( $_FILES ) );
 
 		$posted       = wp_unslash( $_POST );
-		$redirect_url = self::resolve_redirect_url( $form_id, is_array( $posted ) ? $posted : array() );
+		$redirect_url = self::resolve_redirect_url( $form_id, is_array( $posted ) ? $posted : array(), true );
 		$status       = self::normalize_status( $result );
 
 		$status_args = array(
@@ -213,11 +213,12 @@ class Oli_CF_Submission {
 	/**
 	 * Redirect target after a non-AJAX submit: posted permalink, raw referer, then home.
 	 *
-	 * @param int                  $form_id Form ID.
-	 * @param array<string, mixed> $posted  Unslashed POST data.
+	 * @param int                  $form_id    Form ID.
+	 * @param array<string, mixed> $posted     Unslashed POST data.
+	 * @param bool                 $has_status When true, hash the status banner; otherwise the form.
 	 * @return string
 	 */
-	public static function resolve_redirect_url( $form_id, $posted ) {
+	public static function resolve_redirect_url( $form_id, $posted, $has_status = false ) {
 		if ( ! is_array( $posted ) ) {
 			$posted = array();
 		}
@@ -258,7 +259,20 @@ class Oli_CF_Submission {
 
 		$validated = preg_replace( '/#.*$/', '', $validated );
 
-		return $validated . '#oli-cf-form-' . absint( $form_id );
+		return $validated . self::redirect_fragment( $form_id, $has_status );
+	}
+
+	/**
+	 * Hash fragment for a post-submit return.
+	 *
+	 * @param int  $form_id    Form ID.
+	 * @param bool $has_status Whether a status banner will be shown.
+	 * @return string
+	 */
+	public static function redirect_fragment( $form_id, $has_status = false ) {
+		$prefix = $has_status ? 'oli-cf-response-' : 'oli-cf-form-';
+
+		return '#' . $prefix . absint( $form_id );
 	}
 
 	/**

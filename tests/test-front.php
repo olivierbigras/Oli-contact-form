@@ -60,6 +60,8 @@ oli_cf_assert_true( false !== strpos( $js, ' : ' ), 'error summary prefixes the 
 
 $css = file_get_contents( dirname( __DIR__ ) . '/assets/css/oli-cf-public.css' );
 oli_cf_assert_true( false !== strpos( $css, '#8c8f94' ), 'field border uses the contrast color' );
+oli_cf_assert_true( false !== strpos( $css, '.oli-cf-form .oli-cf-field' ), 'field border selector includes the form to beat themes' );
+oli_cf_assert_true( false !== strpos( $css, 'input.oli-cf-field' ), 'input.oli-cf-field raises specificity over input[type]' );
 oli_cf_assert_true( false !== strpos( $css, 'focus-visible' ), 'focus-visible outline is defined' );
 oli_cf_assert_true( false !== strpos( $css, '#dc3232 !important' ), 'invalid fields use a visible red border' );
 
@@ -83,6 +85,17 @@ $evil = Oli_CF_Submission::resolve_redirect_url(
 	)
 );
 oli_cf_assert_same( 'https://example.com/#oli-cf-form-1', $evil, 'invalid redirect falls back to home then the form anchor' );
+
+$status_redirect = Oli_CF_Submission::resolve_redirect_url(
+	6,
+	array(
+		'oli_cf_redirect' => 'https://example.com/req/',
+	),
+	true
+);
+oli_cf_assert_same( 'https://example.com/req/#oli-cf-response-6', $status_redirect, 'status redirect anchors the message banner' );
+oli_cf_assert_same( '#oli-cf-response-6', Oli_CF_Submission::redirect_fragment( 6, true ), 'status fragment is the response id' );
+oli_cf_assert_same( '#oli-cf-form-6', Oli_CF_Submission::redirect_fragment( 6, false ), 'no-status fragment stays on the form' );
 
 oli_cf_assert_true(
 	Oli_CF_Shortcode::should_register_cf7_compat( array( 'cf7_compat_enabled' => true ) ),
@@ -164,8 +177,22 @@ oli_cf_assert_true( false !== strpos( $replay, 'Please enter a valid email addre
 
 $shortcode_src = file_get_contents( dirname( __DIR__ ) . '/public/class-oli-cf-shortcode.php' );
 oli_cf_assert_true( false !== strpos( $shortcode_src, 'tabindex="-1"' ), 'response output is focusable' );
+oli_cf_assert_true( false !== strpos( $shortcode_src, 'id="oli-cf-response-' ), 'response output has a unique id' );
+oli_cf_assert_true( false !== strpos( $shortcode_src, 'format_error_summary_item' ), 'no-JS error list prefixes the field label' );
+
+$wrapped_labels = Oli_CF_Form_Parser::field_labels( '<label> Your email [email* your-email] </label> [file your-file] [acceptance consent "I agree to the privacy policy"]' );
+oli_cf_assert_same( 'Your email', $wrapped_labels['your-email'], 'wrapping label text is the field label' );
+oli_cf_assert_same( 'Your File', $wrapped_labels['your-file'], 'unlabeled fields use a humanized name' );
+oli_cf_assert_same( 'I agree to the privacy policy', $wrapped_labels['consent'], 'acceptance values become the label' );
+oli_cf_assert_same(
+	'Your email : Please fill out this field.',
+	Oli_CF_Form_Parser::format_error_summary_item( 'Your email', 'Please fill out this field.' ),
+	'no-JS summary line matches the JS Label : message format'
+);
 oli_cf_assert_true( false !== strpos( $shortcode_src, 'oli_cf_status' ), 'shortcode reads oli_cf_status' );
 oli_cf_assert_true( false !== strpos( $shortcode_src, 'consume_feedback' ), 'shortcode consumes the feedback token' );
+oli_cf_assert_true( false !== strpos( $js, 'oli-cf-response-' ), 'JS can focus the hashed status banner' );
+oli_cf_assert_true( false !== strpos( $submission_src, 'redirect_fragment' ), 'redirect hash is chosen from status' );
 
 $submit_html = Oli_CF_Form_Parser::parse( '[submit "Send"]', 8 );
 oli_cf_assert_same( false, strpos( $submit_html, 'disabled' ), 'submit button is not disabled without JS' );

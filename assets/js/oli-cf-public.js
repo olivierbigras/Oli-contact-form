@@ -3,6 +3,28 @@
  * Handles AJAX submission, validation, and anti-spam integration
  */
 
+(function() {
+	'use strict';
+
+	function focusHashResponse() {
+		var hash = window.location.hash || '';
+		if (hash.indexOf('#oli-cf-response-') !== 0) {
+			return;
+		}
+
+		var el = document.getElementById(hash.slice(1));
+		if (el && typeof el.focus === 'function') {
+			el.focus();
+		}
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', focusHashResponse);
+	} else {
+		focusHashResponse();
+	}
+})();
+
 (function($) {
 	'use strict';
 
