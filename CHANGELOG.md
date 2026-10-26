@@ -5,6 +5,11 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2026-10-26
+
+### Fixed
+- `_oli_cf_mail` (and Mail 2) is merged with defaults via `wp_parse_args` before the form editor reads keys. A programmatic or migrated meta missing `reply_to` no longer triggers an undefined-array-key warning. The mailer normalizes the same keys before send.
+
 ## [0.3.4] - 2026-10-26
 
 ### Fixed

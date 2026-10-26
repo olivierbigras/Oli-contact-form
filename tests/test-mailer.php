@@ -100,6 +100,45 @@ $mail_files   = Oli_CF_Mailer::build_mail(
 
 oli_cf_assert_same( array(), $mail_files['attachments'], 'missing attachment paths are dropped' );
 
+$partial_mail = array(
+	'to'      => 'owner@example.com',
+	'from'    => 'admin@example.com',
+	'subject' => 'Partial',
+	'body'    => 'Hello',
+);
+
+$normalized_partial = Oli_CF_Mailer::normalize_mail( $partial_mail );
+oli_cf_assert_same( 'owner@example.com', $normalized_partial['to'], 'partial mail keeps the stored To' );
+oli_cf_assert_true( array_key_exists( 'reply_to', $normalized_partial ), 'partial mail meta gets reply_to' );
+oli_cf_assert_same( '[your-email]', $normalized_partial['reply_to'], 'missing reply_to uses the default' );
+oli_cf_assert_true( array_key_exists( 'additional_headers', $normalized_partial ), 'partial mail meta gets additional_headers' );
+oli_cf_assert_same( '', $normalized_partial['additional_headers'], 'missing additional_headers is an empty string' );
+
+$built_partial = Oli_CF_Mailer::build_mail(
+	$partial_mail,
+	array(
+		'your-email' => 'ada@example.com',
+	)
+);
+oli_cf_assert_true( in_array( 'Reply-To: ada@example.com', $built_partial['headers'], true ), 'partial mail send fills default Reply-To' );
+
+foreach ( array( 'to', 'from', 'subject', 'body', 'reply_to', 'additional_headers' ) as $mail_key ) {
+	oli_cf_assert_true( array_key_exists( $mail_key, $normalized_partial ), 'normalized mail has ' . $mail_key );
+}
+
+$partial_mail_2 = array(
+	'enabled' => true,
+	'to'      => '[your-email]',
+);
+$normalized_mail_2 = Oli_CF_Mailer::normalize_mail( $partial_mail_2, true );
+oli_cf_assert_true( $normalized_mail_2['enabled'], 'partial mail 2 keeps enabled' );
+oli_cf_assert_true( array_key_exists( 'reply_to', $normalized_mail_2 ), 'partial mail 2 meta gets reply_to' );
+oli_cf_assert_same( '', $normalized_mail_2['reply_to'], 'mail 2 missing reply_to defaults to empty' );
+
+$meta_src = file_get_contents( dirname( __DIR__ ) . '/admin/class-oli-cf-meta-boxes.php' );
+oli_cf_assert_true( false !== strpos( $meta_src, 'wp_parse_args( (array)' ), 'mail meta boxes merge stored values with defaults' );
+oli_cf_assert_true( false !== strpos( $meta_src, 'get_default_mail()' ), 'mail 1 uses get_default_mail()' );
+
 if ( $oli_cf_failures > 0 ) {
 	fwrite( STDERR, "\n{$oli_cf_failures} mailer test(s) failed.\n" );
 	exit( 1 );

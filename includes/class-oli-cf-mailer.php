@@ -30,6 +30,9 @@ class Oli_CF_Mailer {
 			return false;
 		}
 
+		$mail_settings   = self::normalize_mail( $mail_settings );
+		$mail_2_settings = self::normalize_mail( $mail_2_settings, true );
+
 		$main       = self::build_mail( $mail_settings, $data, $attachments );
 		$main['to'] = self::resolve_recipient( $main['to'] );
 
@@ -51,6 +54,56 @@ class Oli_CF_Mailer {
 	}
 
 	/**
+	 * Default notification mail settings.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function default_mail() {
+		return array(
+			'to'                 => (string) get_option( 'admin_email' ),
+			'from'               => (string) get_option( 'admin_email' ),
+			'subject'            => 'New message from [your-name]',
+			'body'               => "From: [your-name] <[your-email]>\nSubject: [your-subject]\n\nMessage:\n[your-message]",
+			'reply_to'           => '[your-email]',
+			'additional_headers' => '',
+		);
+	}
+
+	/**
+	 * Default confirmation (Mail 2) settings.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function default_mail_2() {
+		return array(
+			'enabled'            => false,
+			'to'                 => '[your-email]',
+			'from'               => (string) get_option( 'admin_email' ),
+			'subject'            => 'Thank you for your message',
+			'body'               => "Thank you for contacting us.\n\nWe will get back to you soon.",
+			'reply_to'           => '',
+			'additional_headers' => '',
+		);
+	}
+
+	/**
+	 * Fill missing mail keys so migrated or programmatic meta does not warn.
+	 *
+	 * @param mixed $mail      Stored mail meta.
+	 * @param bool  $is_mail_2 Whether this is Mail 2.
+	 * @return array<string, mixed>
+	 */
+	public static function normalize_mail( $mail, $is_mail_2 = false ) {
+		$defaults = $is_mail_2 ? self::default_mail_2() : self::default_mail();
+
+		if ( ! is_array( $mail ) ) {
+			$mail = array();
+		}
+
+		return wp_parse_args( $mail, $defaults );
+	}
+
+	/**
 	 * Build a mail payload without sending.
 	 *
 	 * @param array<string, mixed> $settings    Mail settings.
@@ -59,9 +112,7 @@ class Oli_CF_Mailer {
 	 * @return array<string, mixed>
 	 */
 	public static function build_mail( $settings, $data, $attachments = array() ) {
-		if ( ! is_array( $settings ) ) {
-			$settings = array();
-		}
+		$settings = self::normalize_mail( $settings );
 
 		if ( ! is_array( $data ) ) {
 			$data = array();

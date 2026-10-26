@@ -391,6 +391,27 @@ function wp_json_encode_fallback( $data ) {
 	return is_string( $json ) ? $json : '';
 }
 
+if ( ! function_exists( 'wp_parse_args' ) ) {
+	/**
+	 * @param mixed $args     Args.
+	 * @param mixed $defaults Defaults.
+	 * @return array<string, mixed>
+	 */
+	function wp_parse_args( $args, $defaults = array() ) {
+		if ( is_object( $args ) ) {
+			$args = get_object_vars( $args );
+		} elseif ( ! is_array( $args ) ) {
+			$args = array();
+		}
+
+		if ( ! is_array( $defaults ) ) {
+			$defaults = array();
+		}
+
+		return array_merge( $defaults, $args );
+	}
+}
+
 if ( ! function_exists( 'wp_doing_ajax' ) ) {
 	/**
 	 * @return bool

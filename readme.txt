@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.4
+Stable tag: 0.3.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -129,6 +129,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 == Changelog ==
 
+= 0.3.5 =
+* Merge stored _oli_cf_mail / _oli_cf_mail_2 with defaults (wp_parse_args) so a migrated meta without reply_to does not warn on the form editor. The mailer does the same before send.
+
 = 0.3.4 =
 * No-JS status return now hashes #oli-cf-response-{id} (the banner has that id, tabindex="-1"). Without a status the hash stays #oli-cf-form-{id}.
 * No-JS error summary links prefix the field label (Label : message), like the JS summary.
@@ -185,6 +188,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.5 =
+Form editor no longer warns when notification mail meta is missing reply_to (programmatic or migrated forms).
 
 = 0.3.4 =
 No-JS status returns land on the message banner. Field borders keep #8c8f94 under common themes.

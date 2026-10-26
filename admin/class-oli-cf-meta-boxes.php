@@ -105,11 +105,7 @@ class Oli_CF_Meta_Boxes {
 	 * @param WP_Post $post Post object.
 	 */
 	public function render_mail_settings( $post ) {
-		$mail = get_post_meta( $post->ID, '_oli_cf_mail', true );
-
-		if ( empty( $mail ) || ! is_array( $mail ) ) {
-			$mail = $this->get_default_mail();
-		}
+		$mail = wp_parse_args( (array) get_post_meta( $post->ID, '_oli_cf_mail', true ), $this->get_default_mail() );
 		?>
 		<table class="form-table">
 			<tr>
@@ -152,19 +148,7 @@ class Oli_CF_Meta_Boxes {
 	 * @param WP_Post $post Post object.
 	 */
 	public function render_mail_2_settings( $post ) {
-		$mail_2 = get_post_meta( $post->ID, '_oli_cf_mail_2', true );
-
-		if ( empty( $mail_2 ) || ! is_array( $mail_2 ) ) {
-			$mail_2 = array(
-				'enabled'            => false,
-				'to'                 => '[your-email]',
-				'from'               => get_option( 'admin_email' ),
-				'subject'            => 'Thank you for your message',
-				'body'               => "Thank you for contacting us.\n\nWe will get back to you soon.",
-				'reply_to'           => '',
-				'additional_headers' => '',
-			);
-		}
+		$mail_2 = wp_parse_args( (array) get_post_meta( $post->ID, '_oli_cf_mail_2', true ), $this->get_default_mail_2() );
 		?>
 		<p>
 			<label>
@@ -332,13 +316,15 @@ class Oli_CF_Meta_Boxes {
 	 * @return array<string, string>
 	 */
 	private function get_default_mail() {
-		return array(
-			'to'                 => get_option( 'admin_email' ),
-			'from'               => get_option( 'admin_email' ),
-			'subject'            => 'New message from [your-name]',
-			'body'               => "From: [your-name] <[your-email]>\nSubject: [your-subject]\n\nMessage:\n[your-message]",
-			'reply_to'           => '[your-email]',
-			'additional_headers' => '',
-		);
+		return Oli_CF_Mailer::default_mail();
+	}
+
+	/**
+	 * Get default Mail 2 settings.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function get_default_mail_2() {
+		return Oli_CF_Mailer::default_mail_2();
 	}
 }

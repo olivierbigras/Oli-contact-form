@@ -1,4 +1,4 @@
-# Testing Guide for Oli Contact Form v0.3.4
+# Testing Guide for Oli Contact Form v0.3.5
 
 ## CLI tests
 
@@ -6,7 +6,7 @@
 php tests/run.php
 ```
 
-Covers validation (including minlength/maxlength), mail building and CF7 special mail-tags, reCAPTCHA v2/v3 (version setting, score rules), upload deletion, CF7 import (file + acceptance required-unless-optional), AJAX `self`/banner/spinner reset, no-JS validation vs mail_failed transients, status-banner redirect hash, field-border specificity, and required-field marks.
+Covers validation (including minlength/maxlength), mail building and CF7 special mail-tags, reCAPTCHA v2/v3 (version setting, score rules), upload deletion, CF7 import (file + acceptance required-unless-optional), AJAX `self`/banner/spinner reset, no-JS validation vs mail_failed transients, status-banner redirect hash, field-border specificity, required-field marks, and partial `_oli_cf_mail` meta.
 
 ## Manual checks
 
