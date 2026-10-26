@@ -414,13 +414,11 @@ class Oli_CF_Mailer {
 		}
 
 		if ( ! empty( $_SERVER['HTTP_REFERER'] ) ) {
-			$referer = wp_unslash( $_SERVER['HTTP_REFERER'] );
+			$referer = esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) );
 
-			if ( function_exists( 'esc_url_raw' ) ) {
-				return esc_url_raw( $referer );
+			if ( '' !== $referer ) {
+				return $referer;
 			}
-
-			return esc_url( $referer );
 		}
 
 		if ( function_exists( 'home_url' ) ) {
