@@ -47,6 +47,10 @@ class Oli_CF_Submission {
 	 * Handle non-AJAX form submission (fallback).
 	 */
 	public function handle_non_ajax_submission() {
+		if ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() ) {
+			return;
+		}
+
 		if ( ! isset( $_POST['oli_cf_submit'] ) || ! isset( $_POST['oli_cf_form_id'] ) ) {
 			return;
 		}
@@ -63,11 +67,8 @@ class Oli_CF_Submission {
 
 		$result = $this->process_submission( $form_id, wp_unslash( $_POST ), $this->normalize_files( $_FILES ) );
 
-		$redirect_url = wp_get_referer();
-
-		if ( ! $redirect_url ) {
-			$redirect_url = home_url( '/' );
-		}
+		$posted       = wp_unslash( $_POST );
+		$redirect_url = self::resolve_redirect_url( $form_id, is_array( $posted ) ? $posted : array() );
 
 		$status_args = array(
 			'oli_cf_status_nonce' => wp_create_nonce( 'oli_cf_status_' . $form_id ),
@@ -81,6 +82,57 @@ class Oli_CF_Submission {
 
 		wp_safe_redirect( add_query_arg( $status_args, $redirect_url ) );
 		exit;
+	}
+
+	/**
+	 * Redirect target after a non-AJAX submit: posted permalink, raw referer, then home.
+	 *
+	 * @param int                  $form_id Form ID.
+	 * @param array<string, mixed> $posted  Unslashed POST data.
+	 * @return string
+	 */
+	public static function resolve_redirect_url( $form_id, $posted ) {
+		if ( ! is_array( $posted ) ) {
+			$posted = array();
+		}
+
+		$candidate = '';
+
+		if ( ! empty( $posted['oli_cf_redirect'] ) && is_string( $posted['oli_cf_redirect'] ) ) {
+			$candidate = $posted['oli_cf_redirect'];
+		}
+
+		if ( '' === $candidate && function_exists( 'wp_get_raw_referer' ) ) {
+			$raw = wp_get_raw_referer();
+
+			if ( is_string( $raw ) && '' !== $raw ) {
+				$candidate = $raw;
+			}
+		}
+
+		if ( '' === $candidate && function_exists( 'wp_get_referer' ) ) {
+			$ref = wp_get_referer();
+
+			if ( is_string( $ref ) && '' !== $ref ) {
+				$candidate = $ref;
+			}
+		}
+
+		$fallback = function_exists( 'home_url' ) ? home_url( '/' ) : '/';
+
+		if ( function_exists( 'wp_validate_redirect' ) ) {
+			$validated = wp_validate_redirect( $candidate, $fallback );
+		} else {
+			$validated = '' !== $candidate ? $candidate : $fallback;
+		}
+
+		if ( ! is_string( $validated ) || '' === $validated ) {
+			$validated = $fallback;
+		}
+
+		$validated = preg_replace( '/#.*$/', '', $validated );
+
+		return $validated . '#oli-cf-form-' . absint( $form_id );
 	}
 
 	/**
@@ -195,6 +247,7 @@ class Oli_CF_Submission {
 			'action',
 			'nonce',
 			'oli_cf_nonce',
+			'oli_cf_redirect',
 			'_wpnonce',
 			'_wp_http_referer',
 		);

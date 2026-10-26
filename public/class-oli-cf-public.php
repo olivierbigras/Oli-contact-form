@@ -81,12 +81,13 @@ class Oli_CF_Public {
 		$deps = array( 'jquery' );
 
 		if ( self::recaptcha_client_should_load( $settings ) ) {
+			$recaptcha_version = self::recaptcha_version( $settings );
 			wp_enqueue_script(
 				'oli-cf-recaptcha',
-				// phpcs:ignore PluginCheck.CodeAnalysis.EnqueuedResourceOffloading.OffloadedContent -- Official Google reCAPTCHA v3 API; must be served by Google and cannot be self-hosted. Loaded only when reCAPTCHA is enabled and a form is present.
-				'https://www.google.com/recaptcha/api.js?render=' . rawurlencode( $settings['recaptcha_site_key'] ),
+				// phpcs:ignore PluginCheck.CodeAnalysis.EnqueuedResourceOffloading.OffloadedContent -- Official Google reCAPTCHA API; must be served by Google and cannot be self-hosted. Loaded only when reCAPTCHA is enabled and a form is present.
+				self::recaptcha_script_url( $settings ),
 				array(),
-				'3',
+				$recaptcha_version,
 				true
 			);
 			$deps[] = 'oli-cf-recaptcha';
@@ -127,10 +128,20 @@ class Oli_CF_Public {
 				'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
 				'nonce'            => wp_create_nonce( 'oli_cf_submit' ),
 				'recaptchaSiteKey' => self::recaptcha_client_should_load( $settings ) ? $settings['recaptcha_site_key'] : '',
+				'recaptchaVersion' => self::recaptcha_version( $settings ),
 				'turnstileSiteKey' => self::turnstile_client_should_load( $settings ) ? $settings['turnstile_site_key'] : '',
 				'strings'          => array(
 					'validationError' => __( 'One or more fields have an error. Please check and try again.', 'oli-contact-form' ),
 					'unexpectedError' => __( 'An unexpected error occurred. Please try again.', 'oli-contact-form' ),
+					/* translators: %d: number of invalid fields */
+					'errorBanner'     => __( 'The form contains %d errors.', 'oli-contact-form' ),
+					'invalidRequired' => __( 'This field is required.', 'oli-contact-form' ),
+					'invalidEmail'    => __( 'Please enter a valid email address.', 'oli-contact-form' ),
+					'invalidTel'      => __( 'Please enter a valid phone number.', 'oli-contact-form' ),
+					'invalidUrl'      => __( 'Please enter a valid URL.', 'oli-contact-form' ),
+					'invalidNumber'   => __( 'Please enter a valid number.', 'oli-contact-form' ),
+					'invalidDate'     => __( 'Please enter a valid date.', 'oli-contact-form' ),
+					'acceptTerms'     => __( 'You must accept this to proceed.', 'oli-contact-form' ),
 				),
 			)
 		);
@@ -146,6 +157,72 @@ class Oli_CF_Public {
 	 */
 	private static function recaptcha_client_should_load( $settings ) {
 		return ! empty( $settings['recaptcha_enabled'] ) && ! empty( $settings['recaptcha_site_key'] );
+	}
+
+	/**
+	 * Configured reCAPTCHA version (v2 or v3). Never inferred from the key.
+	 *
+	 * @param array<string, mixed> $settings Plugin settings.
+	 * @return string
+	 */
+	public static function recaptcha_version( $settings ) {
+		if ( ! is_array( $settings ) ) {
+			$settings = array();
+		}
+
+		return Oli_CF_Anti_Spam::normalize_recaptcha_version( $settings );
+	}
+
+	/**
+	 * Official Google reCAPTCHA script URL for the configured version.
+	 *
+	 * v2 uses api.js with no render parameter. v3 uses api.js?render=SITEKEY.
+	 *
+	 * @param array<string, mixed> $settings Plugin settings.
+	 * @return string
+	 */
+	public static function recaptcha_script_url( $settings ) {
+		if ( ! is_array( $settings ) ) {
+			$settings = array();
+		}
+
+		$base = 'https://www.google.com/recaptcha/api.js';
+
+		if ( 'v2' === self::recaptcha_version( $settings ) ) {
+			return $base;
+		}
+
+		$key = isset( $settings['recaptcha_site_key'] ) ? (string) $settings['recaptcha_site_key'] : '';
+
+		return $base . '?render=' . rawurlencode( $key );
+	}
+
+	/**
+	 * Markup for the configured reCAPTCHA widget (v2 checkbox or v3 hidden token).
+	 *
+	 * @param int                  $form_id  Form ID.
+	 * @param array<string, mixed> $settings Plugin settings.
+	 * @return string
+	 */
+	public static function recaptcha_widget_html( $form_id, $settings ) {
+		if ( ! self::recaptcha_client_should_load( $settings ) ) {
+			return '';
+		}
+
+		$form_id = absint( $form_id );
+		$key     = isset( $settings['recaptcha_site_key'] ) ? (string) $settings['recaptcha_site_key'] : '';
+
+		if ( 'v2' === self::recaptcha_version( $settings ) ) {
+			return sprintf(
+				'<div class="g-recaptcha" data-sitekey="%s"></div>',
+				esc_attr( $key )
+			);
+		}
+
+		return sprintf(
+			'<input type="hidden" name="g-recaptcha-response" id="oli-cf-recaptcha-%d" value="" />',
+			$form_id
+		);
 	}
 
 	/**

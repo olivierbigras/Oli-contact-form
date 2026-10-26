@@ -22,7 +22,7 @@ class Oli_CF_Shortcode {
 
 		$settings = get_option( 'oli_cf_settings', array() );
 
-		if ( ! empty( $settings['cf7_compat_enabled'] ) ) {
+		if ( self::should_register_cf7_compat( $settings ) ) {
 			add_shortcode( 'contact-form-7', array( $this, 'render_cf7_compat_shortcode' ) );
 		}
 	}
@@ -49,6 +49,30 @@ class Oli_CF_Shortcode {
 		}
 
 		return $this->render_form( $form_id );
+	}
+
+	/**
+	 * Whether the CF7 compatibility shortcode may be registered.
+	 *
+	 * Never steal [contact-form-7] while Contact Form 7 is active.
+	 *
+	 * @param mixed $settings Plugin settings.
+	 * @return bool
+	 */
+	public static function should_register_cf7_compat( $settings ) {
+		if ( ! is_array( $settings ) || empty( $settings['cf7_compat_enabled'] ) ) {
+			return false;
+		}
+
+		if ( defined( 'WPCF7_VERSION' ) || class_exists( 'WPCF7' ) || class_exists( 'WPCF7_ContactForm' ) ) {
+			return false;
+		}
+
+		if ( function_exists( 'shortcode_exists' ) && shortcode_exists( 'contact-form-7' ) ) {
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
@@ -137,10 +161,15 @@ class Oli_CF_Shortcode {
 			$settings = array();
 		}
 
+		$form_messages = Oli_CF_Validator::normalize_messages( get_post_meta( $form_id, '_oli_cf_messages', true ) );
+		$has_status    = ( '' !== $success_message || '' !== $error_message );
+		$has_required  = Oli_CF_Form_Parser::template_has_required( $template );
+		$redirect_to   = self::current_page_url();
+
 		ob_start();
 		?>
-		<div class="oli-cf-container" id="oli-cf-container-<?php echo esc_attr( (string) absint( $form_id ) ); ?>">
-			<div class="oli-cf-response-output" aria-live="polite" role="status">
+		<div class="oli-cf-container<?php echo $has_status ? ' oli-cf-has-status' : ''; ?>" id="oli-cf-container-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" tabindex="-1">
+			<div class="oli-cf-response-output" aria-live="polite" role="<?php echo $error_message ? 'alert' : 'status'; ?>">
 				<?php if ( $success_message ) : ?>
 					<div class="oli-cf-response-success"><?php echo esc_html( $success_message ); ?></div>
 				<?php endif; ?>
@@ -149,10 +178,15 @@ class Oli_CF_Shortcode {
 				<?php endif; ?>
 			</div>
 
-			<form class="oli-cf-form" id="oli-cf-form-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" method="post" enctype="multipart/form-data" novalidate="novalidate">
+			<form class="oli-cf-form" id="oli-cf-form-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" method="post" enctype="multipart/form-data" novalidate="novalidate" data-oli-messages="<?php echo esc_attr( wp_json_encode( $form_messages ) ); ?>">
 				<?php wp_nonce_field( 'oli_cf_submit_' . $form_id, 'oli_cf_nonce' ); ?>
 				<input type="hidden" name="oli_cf_form_id" value="<?php echo esc_attr( (string) absint( $form_id ) ); ?>" />
 				<input type="hidden" name="form_id" value="<?php echo esc_attr( (string) absint( $form_id ) ); ?>" />
+				<input type="hidden" name="oli_cf_redirect" value="<?php echo esc_url( $redirect_to ); ?>" />
+
+				<?php if ( $has_required ) : ?>
+					<p class="oli-cf-required-note">* <?php esc_html_e( 'Required field', 'oli-contact-form' ); ?></p>
+				<?php endif; ?>
 
 				<div class="oli-cf-honeypot" aria-hidden="true">
 					<label for="oli-cf-hp-<?php echo esc_attr( (string) absint( $form_id ) ); ?>"><?php esc_html_e( 'Leave this field empty', 'oli-contact-form' ); ?></label>
@@ -161,9 +195,7 @@ class Oli_CF_Shortcode {
 
 				<?php echo Oli_CF_Form_Parser::parse( $template, $form_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- parse() runs wp_kses(). ?>
 
-				<?php if ( ! empty( $settings['recaptcha_enabled'] ) && ! empty( $settings['recaptcha_site_key'] ) ) : ?>
-					<input type="hidden" name="g-recaptcha-response" id="oli-cf-recaptcha-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" />
-				<?php endif; ?>
+				<?php echo Oli_CF_Public::recaptcha_widget_html( $form_id, $settings ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes attributes. ?>
 
 				<?php if ( ! empty( $settings['turnstile_enabled'] ) && ! empty( $settings['turnstile_site_key'] ) ) : ?>
 					<div class="cf-turnstile" data-sitekey="<?php echo esc_attr( $settings['turnstile_site_key'] ); ?>" data-callback="oliCfTurnstileCallback"></div>
@@ -174,5 +206,32 @@ class Oli_CF_Shortcode {
 		</div>
 		<?php
 		return ob_get_clean();
+	}
+
+	/**
+	 * Permalink of the page that currently displays the form.
+	 *
+	 * @return string
+	 */
+	public static function current_page_url() {
+		if ( function_exists( 'get_permalink' ) ) {
+			$permalink = get_permalink();
+
+			if ( is_string( $permalink ) && '' !== $permalink ) {
+				return $permalink;
+			}
+		}
+
+		if ( function_exists( 'home_url' ) ) {
+			$path = '/';
+
+			if ( ! empty( $_SERVER['REQUEST_URI'] ) ) {
+				$path = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) );
+			}
+
+			return home_url( $path );
+		}
+
+		return '';
 	}
 }

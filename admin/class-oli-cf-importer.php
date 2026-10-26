@@ -193,7 +193,7 @@ class Oli_CF_Importer {
 	 * @return string
 	 */
 	public static function convert_template( $cf7_template ) {
-		$template = (string) $cf7_template;
+		$template = Oli_CF_Form_Parser::normalize_template( $cf7_template );
 
 		$template = preg_replace_callback(
 			'/\[([^\]]+)\]/',
@@ -228,6 +228,10 @@ class Oli_CF_Importer {
 		$type_raw = $tokens[0];
 		$star     = ( substr( $type_raw, -1 ) === '*' );
 		$type     = strtolower( rtrim( $type_raw, '*' ) );
+
+		if ( '' !== $type && '/' === $type[0] ) {
+			return '';
+		}
 
 		$map = array(
 			'text'       => 'text',
@@ -287,8 +291,19 @@ class Oli_CF_Importer {
 				continue;
 			}
 
-			if ( preg_match( '/^[a-z0-9_-]+:/i', $token ) ) {
-				$out[] = $token;
+			if ( preg_match( '/^([a-z0-9_-]+):(.*)$/i', $token, $attr ) ) {
+				$key = strtolower( $attr[1] );
+				$val = $attr[2];
+
+				if ( 'file' === $map[ $type ] && 'filetypes' === $key ) {
+					$val = self::normalize_filetypes( $val );
+
+					if ( '' === $val ) {
+						continue;
+					}
+				}
+
+				$out[] = $key . ':' . $val;
 				continue;
 			}
 
@@ -296,6 +311,44 @@ class Oli_CF_Importer {
 		}
 
 		return implode( ' ', $out );
+	}
+
+	/**
+	 * Normalize a CF7 filetypes option to pipe-separated extensions.
+	 *
+	 * @param string $filetypes Raw filetypes value.
+	 * @return string
+	 */
+	public static function normalize_filetypes( $filetypes ) {
+		$filetypes = strtolower( trim( (string) $filetypes ) );
+
+		$aliases = array(
+			'image/*' => 'jpg|jpeg|png|gif|webp',
+			'audio/*' => 'mp3|wav|ogg|m4a',
+			'video/*' => 'mp4|mov|avi|mpg|wmv',
+		);
+
+		foreach ( $aliases as $alias => $exts ) {
+			$filetypes = str_replace( $alias, $exts, $filetypes );
+		}
+
+		$parts = preg_split( '/[|,;\s]+/', $filetypes );
+		$clean = array();
+
+		if ( is_array( $parts ) ) {
+			foreach ( $parts as $part ) {
+				$part = ltrim( trim( $part ), '.' );
+				$part = preg_replace( '/[^a-z0-9]/', '', $part );
+
+				if ( '' === $part || in_array( $part, Oli_CF_Uploads::BLOCKED_EXTENSIONS, true ) ) {
+					continue;
+				}
+
+				$clean[] = $part;
+			}
+		}
+
+		return implode( '|', array_values( array_unique( $clean ) ) );
 	}
 
 	/**

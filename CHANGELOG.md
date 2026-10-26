@@ -5,6 +5,23 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-10-26
+
+### Added
+- Settings field for reCAPTCHA version (v2 checkbox or v3 invisible). The version is never inferred from the site key.
+- Required-field asterisks in labels and a “Required field” note when a form has required fields.
+- Per-field validation messages (`aria-describedby`, focus first invalid field).
+
+### Fixed
+- AJAX submits were also handled on `init`, which sent a 302 and showed a generic error after a successful mail. The non-AJAX handler now returns immediately when `wp_doing_ajax()`.
+- Non-JS submits redirected to the homepage because `wp_get_referer()` is false on a same-page POST. Redirect uses a hidden permalink validated with `wp_validate_redirect()`, then `wp_get_raw_referer()`, and lands on `#oli-cf-form-{id}`.
+- reCAPTCHA v3 siteverify responses without a `score` are rejected. v2 still accepts `success: true`.
+- Front end loads `api.js` without `render=` and the checkbox widget for v2; v3 keeps `api.js?render=` plus `grecaptcha.execute`. AJAX treats a JSON success payload as success even if the transport used the error callback.
+- CF7 `[file your-file limit:… filetypes:…]` keeps those options. Existing type/size rules, `.php` rejection, attach-then-delete still apply.
+- CF7 `[acceptance]…[/acceptance]` uses the inner text as the checkbox label.
+- Keyboard focus uses `:focus-visible` (2px `#0073aa` on fields, `#1d2327` on the submit button). Field borders are `#8c8f94` (3.24:1).
+- `[contact-form-7]` is registered only when compatibility mode is on **and** Contact Form 7 is not active.
+
 ## [0.3.1] - 2026-10-26
 
 ### Fixed

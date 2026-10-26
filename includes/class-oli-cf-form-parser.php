@@ -29,7 +29,7 @@ class Oli_CF_Form_Parser {
 	 * @return string Parsed HTML.
 	 */
 	public static function parse( $template, $form_id ) {
-		$html = (string) $template;
+		$html = self::normalize_template( $template );
 
 		$html = preg_replace_callback(
 			'/\[([^\]]+)\]/',
@@ -38,6 +38,8 @@ class Oli_CF_Form_Parser {
 			},
 			$html
 		);
+
+		$html = self::inject_required_marks( (string) $html );
 
 		return self::kses( (string) $html );
 	}
@@ -51,7 +53,7 @@ class Oli_CF_Form_Parser {
 	public static function parse_fields( $template ) {
 		$fields = array();
 
-		preg_match_all( '/\[([^\]]+)\]/', (string) $template, $matches );
+		preg_match_all( '/\[([^\]]+)\]/', self::normalize_template( $template ), $matches );
 
 		if ( empty( $matches[1] ) ) {
 			return $fields;
@@ -182,14 +184,15 @@ class Oli_CF_Form_Parser {
 	 */
 	public static function allowed_html() {
 		$common = array(
-			'class'         => true,
-			'id'            => true,
-			'style'         => true,
-			'aria-hidden'   => true,
-			'aria-invalid'  => true,
-			'aria-required' => true,
-			'aria-live'     => true,
-			'role'          => true,
+			'class'            => true,
+			'id'               => true,
+			'style'            => true,
+			'aria-hidden'      => true,
+			'aria-invalid'     => true,
+			'aria-required'    => true,
+			'aria-live'        => true,
+			'aria-describedby' => true,
+			'role'             => true,
 		);
 
 		return array(
@@ -271,6 +274,81 @@ class Oli_CF_Form_Parser {
 	 */
 	public static function kses( $html ) {
 		return wp_kses( $html, self::allowed_html() );
+	}
+
+	/**
+	 * Expand CF7 paired tags such as [acceptance]label[/acceptance].
+	 *
+	 * @param string $template Form template.
+	 * @return string
+	 */
+	public static function normalize_template( $template ) {
+		$template = (string) $template;
+
+		$template = preg_replace_callback(
+			'/\[acceptance(\*?)([^\]]*)\](.*?)\[\/acceptance\]/is',
+			function ( $matches ) {
+				$star  = $matches[1];
+				$rest  = trim( $matches[2] );
+				$label = trim( wp_strip_all_tags( $matches[3] ) );
+				$label = str_replace( array( '"', '[', ']' ), '', $label );
+
+				$out = 'acceptance' . $star;
+
+				if ( '' !== $rest ) {
+					$out .= ' ' . $rest;
+				}
+
+				if ( '' !== $label ) {
+					$out .= ' "' . $label . '"';
+				}
+
+				return '[' . $out . ']';
+			},
+			$template
+		);
+
+		return is_string( $template ) ? $template : '';
+	}
+
+	/**
+	 * Whether a template contains at least one required field.
+	 *
+	 * @param string $template Form template.
+	 * @return bool
+	 */
+	public static function template_has_required( $template ) {
+		foreach ( self::parse_fields( $template ) as $field ) {
+			if ( ! empty( $field['required'] ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Insert a required-field asterisk into labels that wrap a required input.
+	 *
+	 * @param string $html Rendered HTML.
+	 * @return string
+	 */
+	public static function inject_required_marks( $html ) {
+		return preg_replace_callback(
+			'/<label\b([^>]*)>(.*?)<\/label>/is',
+			function ( $matches ) {
+				if ( false !== strpos( $matches[2], '<span class="oli-cf-required"' ) ) {
+					return $matches[0];
+				}
+
+				if ( ! preg_match( '/required="required"|aria-required="true"/', $matches[2] ) ) {
+					return $matches[0];
+				}
+
+				return '<label' . $matches[1] . '><span class="oli-cf-required" aria-hidden="true"> *</span> ' . $matches[2] . '</label>';
+			},
+			(string) $html
+		);
 	}
 
 	/**

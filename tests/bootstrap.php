@@ -371,6 +371,75 @@ if ( ! function_exists( 'wp_get_current_user' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	/**
+	 * @param mixed $data Data.
+	 * @return string
+	 */
+	function wp_json_encode( $data ) {
+		return wp_json_encode_fallback( $data );
+	}
+}
+
+/**
+ * @param mixed $data Data.
+ * @return string
+ */
+function wp_json_encode_fallback( $data ) {
+	$json = json_encode( $data );
+
+	return is_string( $json ) ? $json : '';
+}
+
+if ( ! function_exists( 'wp_doing_ajax' ) ) {
+	/**
+	 * @return bool
+	 */
+	function wp_doing_ajax() {
+		return ! empty( $GLOBALS['oli_cf_test_doing_ajax'] );
+	}
+}
+
+if ( ! function_exists( 'wp_validate_redirect' ) ) {
+	/**
+	 * @param string $location Location.
+	 * @param string $default  Default.
+	 * @return string
+	 */
+	function wp_validate_redirect( $location, $default = '' ) {
+		$location = (string) $location;
+
+		if ( '' === $location ) {
+			return $default;
+		}
+
+		if ( 0 === strpos( $location, 'https://evil.example' ) ) {
+			return $default;
+		}
+
+		return $location;
+	}
+}
+
+if ( ! function_exists( 'wp_get_raw_referer' ) ) {
+	/**
+	 * @return string
+	 */
+	function wp_get_raw_referer() {
+		return isset( $GLOBALS['oli_cf_test_raw_referer'] ) ? (string) $GLOBALS['oli_cf_test_raw_referer'] : '';
+	}
+}
+
+if ( ! function_exists( 'shortcode_exists' ) ) {
+	/**
+	 * @param string $tag Tag.
+	 * @return bool
+	 */
+	function shortcode_exists( $tag ) {
+		return ! empty( $GLOBALS['oli_cf_test_shortcodes'][ $tag ] );
+	}
+}
+
 if ( ! function_exists( 'get_the_author_meta' ) ) {
 	/**
 	 * @param string $field Field.
@@ -461,4 +530,8 @@ require_once dirname( __DIR__ ) . '/includes/class-oli-cf-uploads.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-validator.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-mailer.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-anti-spam.php';
+require_once dirname( __DIR__ ) . '/includes/class-oli-cf-submission.php';
 require_once dirname( __DIR__ ) . '/admin/class-oli-cf-importer.php';
+require_once dirname( __DIR__ ) . '/admin/class-oli-cf-settings.php';
+require_once dirname( __DIR__ ) . '/public/class-oli-cf-public.php';
+require_once dirname( __DIR__ ) . '/public/class-oli-cf-shortcode.php';

@@ -39,7 +39,8 @@ class Oli_CF_Anti_Spam {
 		}
 
 		if ( ! empty( $settings['recaptcha_enabled'] ) && ! empty( $settings['recaptcha_secret_key'] ) ) {
-			$recaptcha_result = self::verify_recaptcha( $data, $settings['recaptcha_secret_key'] );
+			$version          = self::normalize_recaptcha_version( isset( $settings['recaptcha_version'] ) ? $settings['recaptcha_version'] : 'v3' );
+			$recaptcha_result = self::verify_recaptcha( $data, $settings['recaptcha_secret_key'], $version );
 
 			if ( is_array( $recaptcha_result ) ) {
 				return $recaptcha_result;
@@ -62,9 +63,10 @@ class Oli_CF_Anti_Spam {
 	 *
 	 * @param array<string, mixed> $data       Posted data.
 	 * @param string               $secret_key reCAPTCHA secret key.
+	 * @param string               $version    Configured version (v2 or v3).
 	 * @return array<string, string>|true True if valid, array with error if failed.
 	 */
-	private static function verify_recaptcha( $data, $secret_key ) {
+	private static function verify_recaptcha( $data, $secret_key, $version = 'v3' ) {
 		if ( empty( $data['g-recaptcha-response'] ) ) {
 			return array(
 				'type'    => 'validation_failed',
@@ -95,7 +97,7 @@ class Oli_CF_Anti_Spam {
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( ! self::recaptcha_body_is_valid( $body ) ) {
+		if ( ! self::recaptcha_body_is_valid( $body, $version ) ) {
 			return array(
 				'type'    => 'spam',
 				'message' => __( 'Spam detected by reCAPTCHA.', 'oli-contact-form' ),
@@ -111,19 +113,38 @@ class Oli_CF_Anti_Spam {
 	 * v2 responses have `success` (and often `hostname`) but no `score`.
 	 * The score threshold applies only to v3.
 	 *
-	 * @param mixed $body Decoded siteverify body.
+	 * @param mixed  $body    Decoded siteverify body.
+	 * @param string $version Configured version (v2 or v3).
 	 * @return bool
 	 */
-	public static function recaptcha_body_is_valid( $body ) {
+	public static function recaptcha_body_is_valid( $body, $version = 'v3' ) {
 		if ( ! is_array( $body ) || empty( $body['success'] ) ) {
 			return false;
 		}
 
-		if ( isset( $body['score'] ) && (float) $body['score'] < 0.5 ) {
-			return false;
+		$version = self::normalize_recaptcha_version( $version );
+
+		if ( 'v3' === $version ) {
+			if ( ! isset( $body['score'] ) || (float) $body['score'] < 0.5 ) {
+				return false;
+			}
 		}
 
 		return self::recaptcha_hostname_is_valid( $body );
+	}
+
+	/**
+	 * Normalize a configured reCAPTCHA version. Never inferred from the key.
+	 *
+	 * @param mixed $version Version string or settings array.
+	 * @return string 'v2' or 'v3'.
+	 */
+	public static function normalize_recaptcha_version( $version ) {
+		if ( is_array( $version ) ) {
+			$version = isset( $version['recaptcha_version'] ) ? $version['recaptcha_version'] : 'v3';
+		}
+
+		return ( 'v2' === strtolower( (string) $version ) ) ? 'v2' : 'v3';
 	}
 
 	/**

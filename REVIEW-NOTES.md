@@ -8,7 +8,7 @@ This file is for the plugin review team. It is listed in `.distignore` and `.git
 
 Plugin Check reports `OffloadedContent` for the official reCAPTCHA and Turnstile URLs in `public/class-oli-cf-public.php` (client scripts) and `includes/class-oli-cf-anti-spam.php` (server-side `siteverify`). Those URLs are kept on purpose.
 
-Google reCAPTCHA v3 and Cloudflare Turnstile are optional anti-spam **services**, not plugin assets hosted on a CDN. Their client scripts (`https://www.google.com/recaptcha/api.js` and `https://challenges.cloudflare.com/turnstile/v0/api.js`) must be loaded from the provider. Tokens are issued and signed by Google or Cloudflare; a copy bundled in this plugin would not mint valid tokens and would violate each provider’s integration requirements. The matching `siteverify` endpoints are the only supported way to check those tokens.
+Google reCAPTCHA (v2 or v3) and Cloudflare Turnstile are optional anti-spam **services**, not plugin assets hosted on a CDN. Their client scripts (`https://www.google.com/recaptcha/api.js` and `https://challenges.cloudflare.com/turnstile/v0/api.js`) must be loaded from the provider. v2 omits the `render` parameter; v3 appends `?render=SITEKEY`. Tokens are issued and signed by Google or Cloudflare; a copy bundled in this plugin would not mint valid tokens and would violate each provider’s integration requirements. The matching `siteverify` endpoints are the only supported way to check those tokens.
 
 This matches the documented exception for plugins that perform a service (similar to Akismet calling a remote spam API): the remote call *is* the feature, not an offloaded jQuery/CSS file.
 

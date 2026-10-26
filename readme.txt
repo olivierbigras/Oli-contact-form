@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.1
+Stable tag: 0.3.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -27,13 +27,13 @@ Email: oli@olivierbigras.com
 * **File uploads** - Extension and size limits. The file is attached to the notification email and deleted from the server immediately after sending
 * **Required fields and validation** - Server-side checks with editable messages
 * **Admin email + optional confirmation** - Mail 2 sends a copy to the sender. Use `[field-name]` tags in the subject and body
-* **Anti-spam** - Honeypot on every form, plus optional Cloudflare Turnstile or Google reCAPTCHA v3 (scripts load only on pages that contain a form)
+* **Anti-spam** - Honeypot on every form, plus optional Cloudflare Turnstile or Google reCAPTCHA v2/v3 (scripts load only on pages that contain a form)
 * **AJAX submit** - With a non-JavaScript fallback
 * **Translatable** - Standard gettext strings with the `oli-contact-form` text domain, compatible with TranslatePress
 * **CF7 importer** - Converts existing Contact Form 7 form tags and mail settings
 * **No submission database** - Email only. No tracking
 
-Google reCAPTCHA v3 and Cloudflare Turnstile stay off until an administrator enables them and enters API keys. See **External services** below.
+Google reCAPTCHA (v2 or v3) and Cloudflare Turnstile stay off until an administrator enables them and enters API keys. See **External services** below.
 
 == External services ==
 
@@ -43,12 +43,13 @@ This plugin does not call any third-party API by default. The built-in honeypot 
 
 Source code: [https://github.com/olivierbigras/Oli-contact-form](https://github.com/olivierbigras/Oli-contact-form)
 
-= Google reCAPTCHA v3 =
+= Google reCAPTCHA =
 
-When **Enable Google reCAPTCHA v3** is checked and a site key is saved, visitors who view a form load Google's official reCAPTCHA script so a token can be generated. On submit, WordPress verifies that token with Google. The script is not bundled because Google requires `https://www.google.com/recaptcha/api.js`.
+When **Enable Google reCAPTCHA** is checked, a version (v2 or v3) is selected, and a site key is saved, visitors who view a form load Google's official reCAPTCHA script. The version is a saved setting; it is never guessed from the key.
 
+* v2 loads `https://www.google.com/recaptcha/api.js` (no `render` parameter) and shows the “I'm not a robot” checkbox. The widget token is posted as `g-recaptcha-response`.
+* v3 loads `https://www.google.com/recaptcha/api.js?render=SITEKEY` and calls `grecaptcha.execute` on submit. Siteverify must return a score of at least 0.5.
 * When it runs: only if reCAPTCHA is enabled **and** the page has a form (shortcode or block). Verification runs on each submission.
-* Client script (official CDN, cannot be self-hosted): `https://www.google.com/recaptcha/api.js` (with your site key as the `render` parameter).
 * Server endpoint: `https://www.google.com/recaptcha/api/siteverify` via `wp_remote_post` (only on submit, only if enabled).
 * Data sent: the visitor's reCAPTCHA response token, your reCAPTCHA secret key, and the visitor's IP address (`remoteip`). Google may also collect device and interaction data as described in their privacy policy.
 * Service: [https://www.google.com/recaptcha/](https://www.google.com/recaptcha/)
@@ -104,7 +105,7 @@ Yes. AJAX is used when JavaScript is available. Without it, the form posts norma
 
 = How do I enable anti-spam protection? =
 
-Every form includes a honeypot field. For additional protection, go to 'Oli Contact Forms' > 'Settings' to enable Google reCAPTCHA v3 or Cloudflare Turnstile.
+Every form includes a honeypot field. For additional protection, go to 'Oli Contact Forms' > 'Settings' to enable Google reCAPTCHA (v2 or v3) or Cloudflare Turnstile.
 
 = Where are form submissions stored? =
 
@@ -127,6 +128,15 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 5. CF7 importer
 
 == Changelog ==
+
+= 0.3.2 =
+* reCAPTCHA version is a setting (v2 checkbox or v3 execute). Do not guess the version from the key.
+* v3 siteverify responses without a score are rejected. v2 still accepts success:true.
+* CF7 [file] tags keep limit and filetypes. Paired [acceptance]…[/acceptance] becomes the checkbox label.
+* AJAX submits are no longer intercepted by the non-AJAX handler (JSON success instead of a 302).
+* Non-JS submits return to the same page (#oli-cf-form-{id}) via a validated hidden permalink.
+* Per-field error messages, required asterisks, stronger focus and contrast styles.
+* Do not register [contact-form-7] while Contact Form 7 is active.
 
 = 0.3.1 =
 * Accept reCAPTCHA v2 when siteverify returns success (score threshold is v3 only).
@@ -162,6 +172,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.2 =
+Choose reCAPTCHA v2 or v3 in Settings. AJAX success is shown correctly. Imported CF7 file and acceptance fields keep their options and labels.
 
 = 0.3.1 =
 Fixes reCAPTCHA v2 rejection, empty imported CF7 recipients, and missing maxlength/minlength checks.

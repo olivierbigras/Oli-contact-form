@@ -97,6 +97,40 @@ oli_cf_assert_true( isset( $messages['invalid_required'] ), 'default messages ar
 $phone = Oli_CF_Importer::convert_form_tag( 'phone* your-phone' );
 oli_cf_assert_same( 'tel* your-phone', $phone, 'CF7 phone tag becomes tel' );
 
+$file_cf7 = '[file* your-file filetypes:gif|png|jpg|jpeg limit:1mb]';
+$file_out = Oli_CF_Importer::convert_template( $file_cf7 );
+oli_cf_assert_true( false !== strpos( $file_out, '[file* your-file' ), 'required file tag is imported' );
+oli_cf_assert_true( false !== strpos( $file_out, 'limit:1mb' ), 'file limit option is imported' );
+oli_cf_assert_true( false !== strpos( $file_out, 'filetypes:' ), 'filetypes option is imported' );
+
+$file_fields = Oli_CF_Form_Parser::parse_fields( $file_out );
+oli_cf_assert_same( 'file', $file_fields[0]['type'], 'imported file tag is the plugin file type' );
+oli_cf_assert_same( '1mb', $file_fields[0]['attributes']['limit'], 'imported limit is on the field' );
+oli_cf_assert_true( ! empty( $file_fields[0]['attributes']['filetypes'] ), 'imported filetypes are on the field' );
+
+$php_file = Oli_CF_Validator::validate(
+	array(),
+	$file_out,
+	array(
+		'your-file' => array(
+			'name'     => 'shell.php',
+			'type'     => 'application/x-php',
+			'tmp_name' => '/tmp/fake',
+			'error'    => UPLOAD_ERR_OK,
+			'size'     => 100,
+		),
+	)
+);
+oli_cf_assert_true( is_array( $php_file ) && isset( $php_file['your-file'] ), 'imported file field still rejects php' );
+
+$accept_cf7 = Oli_CF_Importer::convert_template( '[acceptance consent] I agree to be contacted. [/acceptance]' );
+oli_cf_assert_true( false !== strpos( $accept_cf7, 'I agree to be contacted.' ), 'CF7 acceptance inner text becomes the label' );
+oli_cf_assert_same( false, strpos( $accept_cf7, '[/acceptance]' ), 'closing acceptance tag is removed' );
+
+$accept_html = Oli_CF_Form_Parser::parse( '[acceptance consent] J\'accepte d\'être contacté. [/acceptance]', 7 );
+oli_cf_assert_true( false !== strpos( $accept_html, 'J\'accepte d\'être contacté.' ), 'paired acceptance text is the checkbox label' );
+oli_cf_assert_same( false, strpos( $accept_html, 'I accept the terms' ), 'default acceptance label is not used when text is provided' );
+
 if ( $oli_cf_failures > 0 ) {
 	fwrite( STDERR, "\n{$oli_cf_failures} CF7 import test(s) failed.\n" );
 	exit( 1 );

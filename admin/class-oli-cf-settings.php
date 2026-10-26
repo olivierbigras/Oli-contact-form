@@ -22,6 +22,7 @@ class Oli_CF_Settings {
 	public static function get_defaults() {
 		return array(
 			'recaptcha_enabled'    => false,
+			'recaptcha_version'    => 'v3',
 			'recaptcha_site_key'   => '',
 			'recaptcha_secret_key' => '',
 			'turnstile_enabled'    => false,
@@ -69,11 +70,26 @@ class Oli_CF_Settings {
 
 		add_settings_field(
 			'recaptcha_enabled',
-			__( 'Enable Google reCAPTCHA v3', 'oli-contact-form' ),
+			__( 'Enable Google reCAPTCHA', 'oli-contact-form' ),
 			array( $this, 'render_checkbox_field' ),
 			'oli-cf-settings',
 			'oli_cf_anti_spam_section',
 			array( 'field' => 'recaptcha_enabled' )
+		);
+
+		add_settings_field(
+			'recaptcha_version',
+			__( 'reCAPTCHA version', 'oli-contact-form' ),
+			array( $this, 'render_select_field' ),
+			'oli-cf-settings',
+			'oli_cf_anti_spam_section',
+			array(
+				'field'   => 'recaptcha_version',
+				'options' => array(
+					'v2' => __( 'v2 (checkbox)', 'oli-contact-form' ),
+					'v3' => __( 'v3 (invisible score)', 'oli-contact-form' ),
+				),
+			)
 		);
 
 		add_settings_field(
@@ -205,6 +221,41 @@ class Oli_CF_Settings {
 	}
 
 	/**
+	 * Render a select field.
+	 *
+	 * @param array<string, mixed> $args Field arguments.
+	 */
+	public function render_select_field( $args ) {
+		$options = get_option( 'oli_cf_settings', array() );
+		$field   = $args['field'];
+		$value   = isset( $options[ $field ] ) ? $options[ $field ] : '';
+		$choices = isset( $args['options'] ) && is_array( $args['options'] ) ? $args['options'] : array();
+
+		if ( 'recaptcha_version' === $field ) {
+			$value = self::normalize_recaptcha_version( $value );
+		}
+		?>
+		<select name="oli_cf_settings[<?php echo esc_attr( $field ); ?>]" id="oli-cf-<?php echo esc_attr( $field ); ?>">
+			<?php foreach ( $choices as $choice_value => $choice_label ) : ?>
+				<option value="<?php echo esc_attr( (string) $choice_value ); ?>" <?php selected( $value, $choice_value ); ?>>
+					<?php echo esc_html( $choice_label ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+		<?php
+	}
+
+	/**
+	 * Normalize a saved reCAPTCHA version. Never inferred from the key.
+	 *
+	 * @param mixed $version Version.
+	 * @return string
+	 */
+	public static function normalize_recaptcha_version( $version ) {
+		return Oli_CF_Anti_Spam::normalize_recaptcha_version( $version );
+	}
+
+	/**
 	 * Render text field.
 	 *
 	 * @param array<string, string> $args Field arguments.
@@ -233,6 +284,7 @@ class Oli_CF_Settings {
 		$sanitized = self::get_defaults();
 
 		$sanitized['recaptcha_enabled']    = ! empty( $input['recaptcha_enabled'] );
+		$sanitized['recaptcha_version']    = self::normalize_recaptcha_version( isset( $input['recaptcha_version'] ) ? $input['recaptcha_version'] : 'v3' );
 		$sanitized['recaptcha_site_key']   = isset( $input['recaptcha_site_key'] ) ? sanitize_text_field( $input['recaptcha_site_key'] ) : '';
 		$sanitized['recaptcha_secret_key'] = isset( $input['recaptcha_secret_key'] ) ? sanitize_text_field( $input['recaptcha_secret_key'] ) : '';
 

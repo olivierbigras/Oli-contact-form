@@ -11,6 +11,7 @@ $tests = array(
 	__DIR__ . '/test-uploads.php',
 	__DIR__ . '/test-cf7-import.php',
 	__DIR__ . '/test-anti-spam.php',
+	__DIR__ . '/test-front.php',
 );
 
 $failed = 0;
