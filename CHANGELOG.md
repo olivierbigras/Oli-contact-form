@@ -5,6 +5,13 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-10-26
+
+### Fixed
+- reCAPTCHA v2 submissions were rejected because the verifier required a `score` that v2 does not return. `success: true` is enough for v2; the 0.5 score threshold applies only to v3. Hostname is checked when present (official Google test keys that report `testkey.google.com` remain accepted). Turnstile is unchanged.
+- Contact Form 7 special mail-tags (`[_site_admin_email]`, `[_site_title]`, `[_site_url]`, `[_site_description]`, `[_remote_ip]`, `[_date]`, `[_time]`, `[_url]`, `[_post_title]`, and related) are resolved when mail is built. If the resolved recipient is empty or invalid, the site `admin_email` is used and the case is logged when `WP_DEBUG` is on.
+- `maxlength` and `minlength` are validated on the server with `mb_strlen` and rendered on text inputs and textareas.
+
 ## [0.3.0] - 2026-10-26
 
 ### Removed

@@ -223,6 +223,8 @@ class Oli_CF_Form_Parser {
 					'min'             => true,
 					'max'             => true,
 					'step'            => true,
+					'maxlength'       => true,
+					'minlength'       => true,
 					'data-size-limit' => true,
 					'data-filetypes'  => true,
 					'autocomplete'    => true,
@@ -237,6 +239,8 @@ class Oli_CF_Form_Parser {
 					'cols'        => true,
 					'placeholder' => true,
 					'required'    => true,
+					'maxlength'   => true,
+					'minlength'   => true,
 				)
 			),
 			'select'   => array_merge(
@@ -339,7 +343,7 @@ class Oli_CF_Form_Parser {
 			esc_attr( $default ),
 			$required ? ' required="required" aria-required="true"' : '',
 			'' !== $placeholder ? ' placeholder="' . esc_attr( $placeholder ) . '"' : '',
-			isset( $attrs['id'] ) ? '' : ''
+			self::length_attributes( $attrs )
 		);
 		$html .= '</span>';
 
@@ -374,7 +378,7 @@ class Oli_CF_Form_Parser {
 
 		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
-			'<textarea name="%s" id="%s" class="%s" rows="%d" cols="%d"%s%s aria-invalid="false">%s</textarea>',
+			'<textarea name="%s" id="%s" class="%s" rows="%d" cols="%d"%s%s%s aria-invalid="false">%s</textarea>',
 			esc_attr( $name ),
 			esc_attr( $id ),
 			esc_attr( $class ),
@@ -382,6 +386,7 @@ class Oli_CF_Form_Parser {
 			$cols,
 			$required ? ' required="required" aria-required="true"' : '',
 			'' !== $placeholder ? ' placeholder="' . esc_attr( $placeholder ) . '"' : '',
+			self::length_attributes( $attrs ),
 			esc_textarea( $default )
 		);
 		$html .= '</span>';
@@ -573,6 +578,38 @@ class Oli_CF_Form_Parser {
 			absint( $form_id ),
 			esc_html( $label )
 		);
+	}
+
+	/**
+	 * maxlength / minlength HTML attributes from a parsed tag.
+	 *
+	 * @param array<string, string> $attrs Field attributes.
+	 * @return string
+	 */
+	private static function length_attributes( $attrs ) {
+		$html = '';
+
+		if ( ! is_array( $attrs ) ) {
+			return $html;
+		}
+
+		if ( isset( $attrs['maxlength'] ) && is_numeric( $attrs['maxlength'] ) ) {
+			$max = absint( $attrs['maxlength'] );
+
+			if ( $max > 0 ) {
+				$html .= ' maxlength="' . $max . '"';
+			}
+		}
+
+		if ( isset( $attrs['minlength'] ) && is_numeric( $attrs['minlength'] ) ) {
+			$min = absint( $attrs['minlength'] );
+
+			if ( $min > 0 ) {
+				$html .= ' minlength="' . $min . '"';
+			}
+		}
+
+		return $html;
 	}
 
 	/**

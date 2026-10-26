@@ -25,6 +25,41 @@ oli_cf_assert_same(
 $unknown = Oli_CF_Mailer::replace_tags( 'Left [missing] here', array( 'your-name' => 'Ada' ) );
 oli_cf_assert_same( 'Left  here', $unknown, 'unknown tags become empty' );
 
+$special = Oli_CF_Mailer::replace_tags(
+	'To [_site_admin_email] from [_site_title] at [_site_url] ([_site_description]) page [_post_title] [_url]',
+	array()
+);
+
+oli_cf_assert_same(
+	'To admin@example.com from Test Site at https://example.com/ (Just another WordPress site) page Contact https://example.com/contact/',
+	$special,
+	'CF7 special mail-tags resolve at send time'
+);
+
+oli_cf_assert_same( 'admin@example.com', Oli_CF_Mailer::resolve_special_tag( '_site_admin_email' ), '[_site_admin_email] is the site admin' );
+oli_cf_assert_same( 'Test Site', Oli_CF_Mailer::resolve_special_tag( '_site_title' ), '[_site_title] is the blog name' );
+oli_cf_assert_true( '' !== Oli_CF_Mailer::resolve_special_tag( '_date' ), '[_date] is not empty' );
+oli_cf_assert_true( '' !== Oli_CF_Mailer::resolve_special_tag( '_time' ), '[_time] is not empty' );
+
+$imported_mail = Oli_CF_Mailer::build_mail(
+	array(
+		'to'      => '[_site_admin_email]',
+		'from'    => '[_site_title] <[_site_admin_email]>',
+		'subject' => 'Message from [_site_title]',
+		'body'    => 'Sent from [_site_url]',
+	),
+	array()
+);
+
+oli_cf_assert_same( 'admin@example.com', $imported_mail['to'], 'imported CF7 To [_site_admin_email] becomes admin_email' );
+oli_cf_assert_true( in_array( 'From: Test Site <admin@example.com>', $imported_mail['headers'], true ), 'From resolves site title and admin email' );
+
+oli_cf_assert_same( 'admin@example.com', Oli_CF_Mailer::resolve_recipient( '' ), 'empty To falls back to admin_email' );
+oli_cf_assert_same( 'admin@example.com', Oli_CF_Mailer::resolve_recipient( 'not-an-email' ), 'invalid To falls back to admin_email' );
+oli_cf_assert_same( 'owner@example.com', Oli_CF_Mailer::resolve_recipient( 'owner@example.com' ), 'valid To is kept' );
+oli_cf_assert_true( Oli_CF_Mailer::recipient_is_valid( 'Site <admin@example.com>' ), 'Name <email> is a valid recipient' );
+oli_cf_assert_false( Oli_CF_Mailer::recipient_is_valid( '' ), 'empty recipient is invalid' );
+
 $mail = Oli_CF_Mailer::build_mail(
 	array(
 		'to'                 => 'owner@example.com',

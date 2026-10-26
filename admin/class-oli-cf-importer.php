@@ -370,6 +370,8 @@ class Oli_CF_Importer {
 			'invalid_url'              => 'invalid_url',
 			'invalid_number'           => 'invalid_number',
 			'invalid_date'             => 'invalid_date',
+			'invalid_too_long'         => 'invalid_too_long',
+			'invalid_too_short'        => 'invalid_too_short',
 			'accept_terms'             => 'accept_terms',
 			'upload_failed'            => 'upload_failed',
 			'upload_file_type_invalid' => 'upload_file_type',

@@ -221,6 +221,8 @@ class Oli_CF_Meta_Boxes {
 			'invalid_url'           => __( 'Invalid URL', 'oli-contact-form' ),
 			'invalid_number'        => __( 'Invalid number', 'oli-contact-form' ),
 			'invalid_date'          => __( 'Invalid date', 'oli-contact-form' ),
+			'invalid_too_long'      => __( 'Too long', 'oli-contact-form' ),
+			'invalid_too_short'     => __( 'Too short', 'oli-contact-form' ),
 			'accept_terms'          => __( 'Acceptance required', 'oli-contact-form' ),
 			'upload_failed'         => __( 'Upload failed', 'oli-contact-form' ),
 			'upload_file_too_large' => __( 'File too large', 'oli-contact-form' ),

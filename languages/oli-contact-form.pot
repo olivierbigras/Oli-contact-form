@@ -34,6 +34,12 @@ msgstr ""
 msgid "Please enter a valid date."
 msgstr ""
 
+msgid "This field is too long."
+msgstr ""
+
+msgid "This field is too short."
+msgstr ""
+
 msgid "The uploaded file is too large."
 msgstr ""
 

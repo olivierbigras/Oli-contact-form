@@ -43,6 +43,22 @@ $mail = Oli_CF_Importer::convert_mail(
 );
 
 oli_cf_assert_same( 'owner@example.com', $mail['to'], 'CF7 recipient becomes To' );
+
+$cf7_default_mail = Oli_CF_Importer::convert_mail(
+	array(
+		'recipient' => '[_site_admin_email]',
+		'sender'    => '[_site_title] <[_site_admin_email]>',
+		'subject'   => '[_site_title] "[your-subject]"',
+		'body'      => "From: [_site_url]\n\n[your-message]",
+	),
+	false
+);
+
+oli_cf_assert_same( '[_site_admin_email]', $cf7_default_mail['to'], 'CF7 special To tag is kept at import' );
+
+$resolved_import = Oli_CF_Mailer::build_mail( $cf7_default_mail, array( 'your-subject' => 'Hi', 'your-message' => 'Hello' ) );
+oli_cf_assert_same( 'admin@example.com', $resolved_import['to'], 'imported [_site_admin_email] resolves when mail is built' );
+oli_cf_assert_true( false !== strpos( $resolved_import['subject'], 'Test Site' ), 'imported [_site_title] resolves in the subject' );
 oli_cf_assert_same( 'Site <admin@example.com>', $mail['from'], 'CF7 sender becomes From' );
 oli_cf_assert_same( 'New message from [your-name]', $mail['subject'], 'subject tags are preserved' );
 oli_cf_assert_same( '[your-email]', $mail['reply_to'], 'Reply-To is lifted out of additional headers' );

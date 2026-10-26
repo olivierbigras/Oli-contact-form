@@ -58,7 +58,7 @@ class Oli_CF_Anti_Spam {
 	}
 
 	/**
-	 * Verify Google reCAPTCHA v3 response.
+	 * Verify Google reCAPTCHA v2 or v3 response.
 	 *
 	 * @param array<string, mixed> $data       Posted data.
 	 * @param string               $secret_key reCAPTCHA secret key.
@@ -95,7 +95,7 @@ class Oli_CF_Anti_Spam {
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( empty( $body['success'] ) || ! isset( $body['score'] ) || $body['score'] < 0.5 ) {
+		if ( ! self::recaptcha_body_is_valid( $body ) ) {
 			return array(
 				'type'    => 'spam',
 				'message' => __( 'Spam detected by reCAPTCHA.', 'oli-contact-form' ),
@@ -103,6 +103,71 @@ class Oli_CF_Anti_Spam {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Whether a siteverify JSON body is an accepted reCAPTCHA result.
+	 *
+	 * v2 responses have `success` (and often `hostname`) but no `score`.
+	 * The score threshold applies only to v3.
+	 *
+	 * @param mixed $body Decoded siteverify body.
+	 * @return bool
+	 */
+	public static function recaptcha_body_is_valid( $body ) {
+		if ( ! is_array( $body ) || empty( $body['success'] ) ) {
+			return false;
+		}
+
+		if ( isset( $body['score'] ) && (float) $body['score'] < 0.5 ) {
+			return false;
+		}
+
+		return self::recaptcha_hostname_is_valid( $body );
+	}
+
+	/**
+	 * Accept a siteverify hostname when one is present.
+	 *
+	 * Official Google test keys report `testkey.google.com`. When the site
+	 * host cannot be determined, a successful response is still accepted.
+	 *
+	 * @param array<string, mixed> $body Decoded siteverify body.
+	 * @return bool
+	 */
+	public static function recaptcha_hostname_is_valid( $body ) {
+		if ( empty( $body['hostname'] ) || ! is_string( $body['hostname'] ) ) {
+			return true;
+		}
+
+		$got = strtolower( $body['hostname'] );
+
+		if ( 'testkey.google.com' === $got ) {
+			return true;
+		}
+
+		$expected = self::expected_site_hostname();
+
+		if ( '' === $expected ) {
+			return true;
+		}
+
+		return $got === $expected;
+	}
+
+	/**
+	 * Site hostname used to compare a reCAPTCHA hostname claim.
+	 *
+	 * @return string
+	 */
+	private static function expected_site_hostname() {
+		if ( ! function_exists( 'home_url' ) || ! function_exists( 'wp_parse_url' ) ) {
+			return '';
+		}
+
+		$host = wp_parse_url( home_url(), PHP_URL_HOST );
+
+		return ( is_string( $host ) && '' !== $host ) ? strtolower( $host ) : '';
 	}
 
 	/**

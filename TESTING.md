@@ -1,4 +1,4 @@
-# Testing Guide for Oli Contact Form v0.3.0
+# Testing Guide for Oli Contact Form v0.3.1
 
 ## CLI tests
 
@@ -6,7 +6,7 @@
 php tests/run.php
 ```
 
-Covers validation, mail building, upload deletion, and CF7 import conversion.
+Covers validation (including minlength/maxlength), mail building and CF7 special mail-tags, reCAPTCHA v2/v3 body checks, upload deletion, and CF7 import conversion.
 
 ## Manual checks
 

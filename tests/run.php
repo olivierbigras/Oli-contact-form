@@ -10,6 +10,7 @@ $tests = array(
 	__DIR__ . '/test-mailer.php',
 	__DIR__ . '/test-uploads.php',
 	__DIR__ . '/test-cf7-import.php',
+	__DIR__ . '/test-anti-spam.php',
 );
 
 $failed = 0;

@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.0
+Stable tag: 0.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,11 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 == Changelog ==
 
+= 0.3.1 =
+* Accept reCAPTCHA v2 when siteverify returns success (score threshold is v3 only).
+* Resolve Contact Form 7 special mail-tags such as [_site_admin_email] on send. Fall back to the site admin email when To is empty or invalid.
+* Enforce maxlength and minlength on the server (mb_strlen) and render those attributes in the form HTML.
+
 = 0.3.0 =
 * Remove submission database storage. Email only.
 * Remove load_plugin_textdomain(); translations load from WordPress.org language packs.
@@ -157,6 +162,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.1 =
+Fixes reCAPTCHA v2 rejection, empty imported CF7 recipients, and missing maxlength/minlength checks.
 
 = 0.3.0 =
 Submissions are email-only. The optional Messages database from 0.2.x is removed. File uploads are still attached to email and then deleted.

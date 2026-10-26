@@ -225,11 +225,160 @@ if ( ! function_exists( 'get_option' ) ) {
 	 * @return mixed
 	 */
 	function get_option( $name, $default = false ) {
-		if ( 'admin_email' === $name ) {
-			return 'admin@example.com';
+		$options = array(
+			'admin_email'     => 'admin@example.com',
+			'blogname'        => 'Test Site',
+			'blogdescription' => 'Just another WordPress site',
+			'home'            => 'https://example.com',
+			'siteurl'         => 'https://example.com',
+			'date_format'     => 'F j, Y',
+			'time_format'     => 'g:i a',
+		);
+
+		if ( isset( $options[ $name ] ) ) {
+			return $options[ $name ];
 		}
 
 		return $default;
+	}
+}
+
+if ( ! function_exists( 'get_bloginfo' ) ) {
+	/**
+	 * @param string $show Show.
+	 * @return string
+	 */
+	function get_bloginfo( $show = '' ) {
+		switch ( $show ) {
+			case 'name':
+				return (string) get_option( 'blogname' );
+			case 'description':
+				return (string) get_option( 'blogdescription' );
+			case 'url':
+				return (string) get_option( 'home' );
+			default:
+				return '';
+		}
+	}
+}
+
+if ( ! function_exists( 'home_url' ) ) {
+	/**
+	 * @param string $path Path.
+	 * @return string
+	 */
+	function home_url( $path = '' ) {
+		$home = rtrim( (string) get_option( 'home' ), '/' );
+
+		if ( '' === $path || '/' === $path ) {
+			return $home . '/';
+		}
+
+		return $home . '/' . ltrim( (string) $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'wp_parse_url' ) ) {
+	/**
+	 * @param string $url       URL.
+	 * @param int    $component Component.
+	 * @return mixed
+	 */
+	function wp_parse_url( $url, $component = -1 ) {
+		return parse_url( $url, $component );
+	}
+}
+
+if ( ! function_exists( 'wp_get_referer' ) ) {
+	/**
+	 * @return string
+	 */
+	function wp_get_referer() {
+		return 'https://example.com/contact/';
+	}
+}
+
+if ( ! function_exists( 'get_the_title' ) ) {
+	/**
+	 * @return string
+	 */
+	function get_the_title() {
+		return 'Contact';
+	}
+}
+
+if ( ! function_exists( 'get_the_ID' ) ) {
+	/**
+	 * @return int
+	 */
+	function get_the_ID() {
+		return 42;
+	}
+}
+
+if ( ! function_exists( 'get_permalink' ) ) {
+	/**
+	 * @return string
+	 */
+	function get_permalink() {
+		return 'https://example.com/contact/';
+	}
+}
+
+if ( ! function_exists( 'get_post_field' ) ) {
+	/**
+	 * @param string $field Field.
+	 * @return string
+	 */
+	function get_post_field( $field ) {
+		return 'post_name' === $field ? 'contact' : '';
+	}
+}
+
+if ( ! function_exists( 'date_i18n' ) ) {
+	/**
+	 * @param string $format Format.
+	 * @return string
+	 */
+	function date_i18n( $format ) {
+		return gmdate( $format, 1761513600 );
+	}
+}
+
+if ( ! function_exists( 'esc_url_raw' ) ) {
+	/**
+	 * @param string $url URL.
+	 * @return string
+	 */
+	function esc_url_raw( $url ) {
+		return filter_var( (string) $url, FILTER_SANITIZE_URL );
+	}
+}
+
+if ( ! function_exists( 'wp_get_current_user' ) ) {
+	/**
+	 * @return object
+	 */
+	function wp_get_current_user() {
+		return (object) array(
+			'ID'           => 0,
+			'user_login'   => '',
+			'user_email'   => '',
+			'display_name' => '',
+			'first_name'   => '',
+			'last_name'    => '',
+		);
+	}
+}
+
+if ( ! function_exists( 'get_the_author_meta' ) ) {
+	/**
+	 * @param string $field Field.
+	 * @return string
+	 */
+	function get_the_author_meta( $field ) {
+		unset( $field );
+		return '';
 	}
 }
 
@@ -311,4 +460,5 @@ require_once dirname( __DIR__ ) . '/includes/class-oli-cf-form-parser.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-uploads.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-validator.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-mailer.php';
+require_once dirname( __DIR__ ) . '/includes/class-oli-cf-anti-spam.php';
 require_once dirname( __DIR__ ) . '/admin/class-oli-cf-importer.php';

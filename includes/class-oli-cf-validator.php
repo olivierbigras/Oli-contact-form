@@ -30,6 +30,8 @@ class Oli_CF_Validator {
 			'invalid_url'           => __( 'Please enter a valid URL.', 'oli-contact-form' ),
 			'invalid_number'        => __( 'Please enter a valid number.', 'oli-contact-form' ),
 			'invalid_date'          => __( 'Please enter a valid date.', 'oli-contact-form' ),
+			'invalid_too_long'      => __( 'This field is too long.', 'oli-contact-form' ),
+			'invalid_too_short'     => __( 'This field is too short.', 'oli-contact-form' ),
 			'accept_terms'          => __( 'You must accept this to proceed.', 'oli-contact-form' ),
 			'upload_failed'         => __( 'File upload failed.', 'oli-contact-form' ),
 			'upload_file_too_large' => __( 'The uploaded file is too large.', 'oli-contact-form' ),
@@ -185,7 +187,54 @@ class Oli_CF_Validator {
 				break;
 		}
 
+		return self::validate_length( $value, $field, $messages );
+	}
+
+	/**
+	 * Apply minlength / maxlength using character length (mb_strlen).
+	 *
+	 * @param mixed                $value    Posted value.
+	 * @param array<string, mixed> $field    Field definition.
+	 * @param array<string, string> $messages Messages.
+	 * @return string|false
+	 */
+	public static function validate_length( $value, $field, $messages ) {
+		$attrs = isset( $field['attributes'] ) && is_array( $field['attributes'] ) ? $field['attributes'] : array();
+		$len   = self::string_length( $value );
+
+		if ( isset( $attrs['maxlength'] ) && is_numeric( $attrs['maxlength'] ) ) {
+			$max = (int) $attrs['maxlength'];
+
+			if ( $max > 0 && $len > $max ) {
+				return isset( $messages['invalid_too_long'] ) ? $messages['invalid_too_long'] : __( 'This field is too long.', 'oli-contact-form' );
+			}
+		}
+
+		if ( isset( $attrs['minlength'] ) && is_numeric( $attrs['minlength'] ) ) {
+			$min = (int) $attrs['minlength'];
+
+			if ( $min > 0 && $len < $min ) {
+				return isset( $messages['invalid_too_short'] ) ? $messages['invalid_too_short'] : __( 'This field is too short.', 'oli-contact-form' );
+			}
+		}
+
 		return false;
+	}
+
+	/**
+	 * Character length of a submitted string.
+	 *
+	 * @param mixed $value Value.
+	 * @return int
+	 */
+	public static function string_length( $value ) {
+		$value = (string) $value;
+
+		if ( function_exists( 'mb_strlen' ) ) {
+			return mb_strlen( $value, 'UTF-8' );
+		}
+
+		return strlen( $value );
 	}
 
 	/**

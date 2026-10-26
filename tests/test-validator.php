@@ -131,6 +131,62 @@ $phone_alias = Oli_CF_Form_Parser::parse_tag( 'phone* your-phone' );
 oli_cf_assert_same( 'tel', $phone_alias['type'], 'phone tag aliases to tel' );
 oli_cf_assert_true( $phone_alias['required'], 'phone* is required' );
 
+$length_template = '[text* your-name maxlength:20 minlength:2] [textarea your-message maxlength:40] [submit "Send"]';
+
+$too_long = Oli_CF_Validator::validate(
+	array(
+		'your-name'    => str_repeat( 'A', 60 ),
+		'your-message' => 'Hello',
+	),
+	$length_template,
+	array()
+);
+
+oli_cf_assert_true( is_array( $too_long ) && isset( $too_long['your-name'] ), 'maxlength is enforced on the server' );
+
+$too_short = Oli_CF_Validator::validate(
+	array(
+		'your-name'    => 'A',
+		'your-message' => 'Hello',
+	),
+	$length_template,
+	array()
+);
+
+oli_cf_assert_true( is_array( $too_short ) && isset( $too_short['your-name'] ), 'minlength is enforced on the server' );
+
+$ok_length = Oli_CF_Validator::validate(
+	array(
+		'your-name'    => 'Ada Lovelace',
+		'your-message' => 'Hello',
+	),
+	$length_template,
+	array()
+);
+
+oli_cf_assert_same( true, $ok_length, 'value within minlength/maxlength passes' );
+
+$multibyte = Oli_CF_Validator::validate(
+	array(
+		'your-name'    => str_repeat( 'é', 21 ),
+		'your-message' => 'Hello',
+	),
+	$length_template,
+	array()
+);
+
+oli_cf_assert_true( is_array( $multibyte ) && isset( $multibyte['your-name'] ), 'maxlength uses mb_strlen for multibyte characters' );
+
+oli_cf_assert_same( 21, Oli_CF_Validator::string_length( str_repeat( 'é', 21 ) ), 'string_length counts characters not bytes' );
+
+$length_html = Oli_CF_Form_Parser::parse( '[text* your-name maxlength:20 minlength:2]', 1 );
+oli_cf_assert_true( false !== strpos( $length_html, 'maxlength="20"' ), 'maxlength is rendered on the input' );
+oli_cf_assert_true( false !== strpos( $length_html, 'minlength="2"' ), 'minlength is rendered on the input' );
+
+$textarea_html = Oli_CF_Form_Parser::parse( '[textarea your-message maxlength:40 minlength:5]', 1 );
+oli_cf_assert_true( false !== strpos( $textarea_html, 'maxlength="40"' ), 'maxlength is rendered on the textarea' );
+oli_cf_assert_true( false !== strpos( $textarea_html, 'minlength="5"' ), 'minlength is rendered on the textarea' );
+
 if ( $oli_cf_failures > 0 ) {
 	fwrite( STDERR, "\n{$oli_cf_failures} validator test(s) failed.\n" );
 	exit( 1 );
