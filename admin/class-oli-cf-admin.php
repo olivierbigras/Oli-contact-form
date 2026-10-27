@@ -122,6 +122,67 @@ class Oli_CF_Admin {
 	/**
 	 * Show the CF7 import result on this plugin's screens only.
 	 */
+	/**
+	 * Show a dismissible notice when file uploads cannot be staged privately.
+	 */
+	public function maybe_staging_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$flagged = Oli_CF_Uploads::has_unavailable_notice();
+		$live    = $this->is_plugin_screen() && '' === Oli_CF_Uploads::staging_parent();
+
+		if ( ! $flagged && ! $live ) {
+			return;
+		}
+
+		$dismiss = '';
+
+		if ( function_exists( 'wp_nonce_url' ) && function_exists( 'add_query_arg' ) ) {
+			$dismiss = wp_nonce_url( add_query_arg( 'oli_cf_dismiss_staging', '1' ), 'oli_cf_dismiss_staging' );
+		}
+
+		echo '<div class="notice notice-error"><p>';
+		echo esc_html( Oli_CF_Uploads::admin_notice_message() );
+
+		if ( '' !== $dismiss ) {
+			echo ' <a href="' . esc_url( $dismiss ) . '">' . esc_html__( 'Dismiss', 'oli-contact-form' ) . '</a>';
+		}
+
+		echo '</p></div>';
+	}
+
+	/**
+	 * Persistently dismiss the staging notice.
+	 */
+	public function maybe_dismiss_staging_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! isset( $_GET['oli_cf_dismiss_staging'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- verified below.
+			return;
+		}
+
+		check_admin_referer( 'oli_cf_dismiss_staging' );
+		Oli_CF_Uploads::clear_unavailable_notice();
+
+		if ( function_exists( 'wp_get_referer' ) && function_exists( 'wp_safe_redirect' ) && function_exists( 'remove_query_arg' ) ) {
+			$target = wp_get_referer();
+
+			if ( ! is_string( $target ) || '' === $target ) {
+				$target = function_exists( 'admin_url' ) ? admin_url() : '/';
+			}
+
+			wp_safe_redirect( remove_query_arg( array( 'oli_cf_dismiss_staging', '_wpnonce' ), $target ) );
+			exit;
+		}
+	}
+
+	/**
+	 * Show the CF7 import result on this plugin's screens only.
+	 */
 	public function maybe_import_notice() {
 		if ( ! $this->is_plugin_screen() || ! current_user_can( 'manage_options' ) ) {
 			return;

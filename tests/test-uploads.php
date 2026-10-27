@@ -47,7 +47,10 @@ $staged = Oli_CF_Uploads::stage_file(
 
 oli_cf_assert_true( is_string( $staged ) && '' !== $staged, 'stage_file returns a path' );
 oli_cf_assert_true( file_exists( $staged ), 'staged file exists' );
-oli_cf_assert_true( false !== strpos( basename( $staged ), 'notes.txt' ), 'staged name keeps the original filename' );
+oli_cf_assert_same( 'bin', pathinfo( $staged, PATHINFO_EXTENSION ), 'staged name is a random .bin' );
+oli_cf_assert_same( 32, strlen( pathinfo( $staged, PATHINFO_FILENAME ) ), 'staged basename is 32 hex characters' );
+oli_cf_assert_false( false !== strpos( basename( $staged ), 'notes.txt' ), 'original filename is not stored on disk' );
+oli_cf_assert_same( array( 'notes.txt' => $staged ), Oli_CF_Uploads::mail_attachments( array( $staged ) ), 'original name is kept for the mail attachment' );
 oli_cf_assert_same( 'hello attachment', file_get_contents( $staged ), 'staged file has the original contents' );
 oli_cf_assert_true( 0 === strpos( basename( dirname( $staged ) ), 'oli-cf-' ), 'staged file lives in a random oli-cf-* directory' );
 
@@ -96,8 +99,22 @@ unlink( $not_upload );
 $GLOBALS['oli_cf_test_temp_dir'] = WP_CONTENT_DIR;
 $parent                          = Oli_CF_Uploads::staging_parent();
 oli_cf_assert_false( rtrim( (string) WP_CONTENT_DIR, '/\\' ) === rtrim( $parent, '/\\' ), 'staging parent is never wp-content/' );
-oli_cf_assert_true( false !== strpos( $parent, '/tmp' ) || false !== strpos( $parent, 'tmp' ), 'staging parent is off-web temp or plugin tmp' );
+oli_cf_assert_true( Oli_CF_Uploads::is_usable_private_temp( $parent ), 'default staging parent is a private temp directory' );
 unset( $GLOBALS['oli_cf_test_temp_dir'] );
+
+$web_tmp = rtrim( ABSPATH, '/\\' ) . '/web-staging';
+if ( ! is_dir( $web_tmp ) ) {
+	mkdir( $web_tmp, 0700, true );
+}
+add_filter(
+	'oli_cf_staging_parent',
+	static function () use ( $web_tmp ) {
+		return $web_tmp;
+	}
+);
+oli_cf_assert_same( '', Oli_CF_Uploads::staging_parent(), 'a temp dir under ABSPATH is refused' );
+$GLOBALS['oli_cf_test_filters']['oli_cf_staging_parent'] = array();
+@rmdir( $web_tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 
 if ( $oli_cf_failures > 0 ) {
 	fwrite( STDERR, "\n{$oli_cf_failures} upload test(s) failed.\n" );

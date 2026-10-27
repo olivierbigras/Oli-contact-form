@@ -43,6 +43,7 @@ class Oli_CF {
 		$this->plugin_name = 'oli-contact-form';
 
 		$this->load_dependencies();
+		Oli_CF_Uploads::maybe_upgrade();
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
 	}
@@ -81,6 +82,8 @@ class Oli_CF {
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
 		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_import_notice' );
+		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_staging_notice' );
+		$this->loader->add_action( 'admin_init', $plugin_admin, 'maybe_dismiss_staging_notice' );
 
 		$post_type = new Oli_CF_Post_Type();
 		$this->loader->add_action( 'init', $post_type, 'register_post_type' );

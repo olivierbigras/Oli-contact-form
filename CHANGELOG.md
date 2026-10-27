@@ -5,6 +5,13 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9] - 2026-10-27
+
+### Security
+- Plus de repli vers `tmp/` du plugin ni vers un dossier sous la racine web. Le staging n’utilise que `get_temp_dir()` / `sys_get_temp_dir()` (ou `OLI_CF_STAGING_DIR` / `oli_cf_staging_parent`) si le `realpath` est hors `ABSPATH`, `WP_CONTENT_DIR` et uploads.
+- Dossier d’attente en `0700`, fichier en `0600`, nom aléatoire `.bin`. Le nom d’origine n’apparaît que comme clé de pièce jointe `wp_mail()`.
+- Sans dossier privé : la soumission avec fichier est refusée (message traduisible, aucun copie, aucun courriel) et un avis admin refermable est fixé. Mise à jour : nettoyage de l’ancien `tmp/` du plugin.
+
 ## [0.3.8] - 2026-10-27
 
 ### Security

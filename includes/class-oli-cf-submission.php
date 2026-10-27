@@ -357,16 +357,31 @@ class Oli_CF_Submission {
 		Oli_CF_Uploads::purge_stale_staging();
 		Oli_CF_Uploads::maybe_schedule_purge();
 
+		$has_uploads = Oli_CF_Uploads::submission_has_uploads( $files, $fields );
+
+		if ( $has_uploads && '' === Oli_CF_Uploads::staging_parent() ) {
+			Oli_CF_Uploads::flag_unavailable_staging();
+
+			return array(
+				'success' => false,
+				'status'  => 'mail_failed',
+				'message' => Oli_CF_Uploads::unavailable_message(),
+				'values'  => $data,
+			);
+		}
+
 		$staged = array();
 		$dir    = '';
 		$sent   = false;
 
 		try {
-			$dir = Oli_CF_Uploads::create_staging_directory();
-			Oli_CF_Uploads::track_for_shutdown( $dir );
+			if ( $has_uploads ) {
+				$dir = Oli_CF_Uploads::create_staging_directory();
+				Oli_CF_Uploads::track_for_shutdown( $dir );
 
-			$staged = Oli_CF_Uploads::stage_files( $files, $fields, $dir );
-			Oli_CF_Uploads::track_for_shutdown( $dir, $staged );
+				$staged = Oli_CF_Uploads::stage_files( $files, $fields, $dir );
+				Oli_CF_Uploads::track_for_shutdown( $dir, $staged );
+			}
 
 			/**
 			 * Fires before sending mail.
@@ -377,7 +392,7 @@ class Oli_CF_Submission {
 			 */
 			do_action( 'oli_cf_before_send', $form_id, $data, $staged );
 
-			$sent = Oli_CF_Mailer::send( $form_id, $data, array_values( $staged ) );
+			$sent = Oli_CF_Mailer::send( $form_id, $data, Oli_CF_Uploads::mail_attachments( array_values( $staged ) ) );
 		} catch ( Throwable $e ) {
 			unset( $e );
 			$sent = false;

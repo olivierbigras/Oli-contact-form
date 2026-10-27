@@ -2,14 +2,14 @@
 # This file is distributed under the GPL v2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Oli Contact Form 0.3.8\n"
+"Project-Id-Version: Oli Contact Form 0.3.9\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/oli-contact-form\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-26T23:29:23+00:00\n"
+"POT-Creation-Date: 2026-10-27T00:31:27+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: oli-contact-form\n"
@@ -74,13 +74,17 @@ msgid "Button text:"
 msgstr ""
 
 #: admin/class-oli-cf-admin.php:116
-#: admin/class-oli-cf-meta-boxes.php:310
+#: admin/class-oli-cf-meta-boxes.php:307
 #: includes/class-oli-cf-form-parser.php:841
 msgid "Send"
 msgstr ""
 
+#: admin/class-oli-cf-admin.php:150
+msgid "Dismiss"
+msgstr ""
+
 #. translators: %d: number of imported forms
-#: admin/class-oli-cf-admin.php:140
+#: admin/class-oli-cf-admin.php:201
 #, php-format
 msgid "%d form imported."
 msgid_plural "%d forms imported."
@@ -121,7 +125,7 @@ msgid "You do not have permission to perform this action."
 msgstr ""
 
 #: admin/class-oli-cf-importer.php:113
-#: includes/class-oli-cf-submission.php:75
+#: includes/class-oli-cf-submission.php:89
 msgid "Security check failed."
 msgstr ""
 
@@ -205,7 +209,7 @@ msgstr ""
 
 #: admin/class-oli-cf-meta-boxes.php:123
 #: admin/class-oli-cf-meta-boxes.php:169
-#: admin/class-oli-cf-meta-boxes.php:305
+#: admin/class-oli-cf-meta-boxes.php:302
 msgid "Subject"
 msgstr ""
 
@@ -302,19 +306,19 @@ msgstr ""
 msgid "Copy this shortcode and paste it into your post, page, or text widget."
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:301
+#: admin/class-oli-cf-meta-boxes.php:298
 msgid "Your name"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:303
+#: admin/class-oli-cf-meta-boxes.php:300
 msgid "Your email"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:307
+#: admin/class-oli-cf-meta-boxes.php:304
 msgid "Your message"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:309
+#: admin/class-oli-cf-meta-boxes.php:306
 msgid "I consent to being contacted about this inquiry."
 msgstr ""
 
@@ -491,16 +495,24 @@ msgstr ""
 msgid "No contact forms found in Trash."
 msgstr ""
 
-#: includes/class-oli-cf-submission.php:42
+#: includes/class-oli-cf-submission.php:56
 msgid "Invalid form ID."
 msgstr ""
 
-#: includes/class-oli-cf-submission.php:293
+#: includes/class-oli-cf-submission.php:307
 msgid "Form not found."
 msgstr ""
 
-#: includes/class-oli-cf-submission.php:304
+#: includes/class-oli-cf-submission.php:318
 msgid "Form configuration error."
+msgstr ""
+
+#: includes/class-oli-cf-uploads.php:298
+msgid "File uploads are unavailable because this site has no private temporary directory. Please contact the site administrator."
+msgstr ""
+
+#: includes/class-oli-cf-uploads.php:307
+msgid "Oli Contact Form cannot store uploaded files: the PHP temporary directory is missing, not writable, or is inside the website directory. Point it to a private directory outside the document root (constant OLI_CF_STAGING_DIR or the oli_cf_staging_parent filter). Forms that accept files will not send until this is fixed."
 msgstr ""
 
 #: includes/class-oli-cf-validator.php:24

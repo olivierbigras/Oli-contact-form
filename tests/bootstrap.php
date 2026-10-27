@@ -237,6 +237,10 @@ if ( ! function_exists( 'get_option' ) ) {
 	 * @return mixed
 	 */
 	function get_option( $name, $default = false ) {
+		if ( isset( $GLOBALS['oli_cf_test_options'] ) && array_key_exists( $name, $GLOBALS['oli_cf_test_options'] ) ) {
+			return $GLOBALS['oli_cf_test_options'][ $name ];
+		}
+
 		$options = array(
 			'admin_email'     => 'admin@example.com',
 			'blogname'        => 'Test Site',
@@ -252,6 +256,69 @@ if ( ! function_exists( 'get_option' ) ) {
 		}
 
 		return $default;
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	/**
+	 * @param string $name  Name.
+	 * @param mixed  $value Value.
+	 * @param mixed  $autoload Autoload.
+	 * @return bool
+	 */
+	function update_option( $name, $value, $autoload = true ) {
+		unset( $autoload );
+		$GLOBALS['oli_cf_test_options'][ (string) $name ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_option' ) ) {
+	/**
+	 * @param string $name Name.
+	 * @return bool
+	 */
+	function delete_option( $name ) {
+		unset( $GLOBALS['oli_cf_test_options'][ (string) $name ] );
+		return true;
+	}
+}
+
+if ( ! function_exists( 'add_option' ) ) {
+	/**
+	 * @param string $name  Name.
+	 * @param mixed  $value Value.
+	 * @return bool
+	 */
+	function add_option( $name, $value ) {
+		if ( isset( $GLOBALS['oli_cf_test_options'][ (string) $name ] ) ) {
+			return false;
+		}
+
+		$GLOBALS['oli_cf_test_options'][ (string) $name ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_upload_dir' ) ) {
+	/**
+	 * @return array<string, string>
+	 */
+	function wp_upload_dir() {
+		return array(
+			'basedir' => WP_CONTENT_DIR . '/uploads',
+		);
+	}
+}
+
+if ( ! function_exists( 'current_user_can' ) ) {
+	/**
+	 * @param string $cap Cap.
+	 * @return bool
+	 */
+	function current_user_can( $cap ) {
+		unset( $cap );
+		return ! empty( $GLOBALS['oli_cf_test_can_manage'] );
 	}
 }
 

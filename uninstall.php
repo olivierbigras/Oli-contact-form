@@ -26,6 +26,7 @@ function oli_cf_uninstall_current_site() {
 
 	delete_option( 'oli_cf_settings' );
 	delete_option( 'oli_cf_db_version' );
+	delete_option( Oli_CF_Uploads::NOTICE_OPTION );
 
 	wp_clear_scheduled_hook( 'oli_cf_purge_stored_messages' );
 	Oli_CF_Uploads::clear_scheduled_purge();

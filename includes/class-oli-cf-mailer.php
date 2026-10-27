@@ -284,10 +284,16 @@ class Oli_CF_Mailer {
 		$safe_attachments = array();
 
 		if ( is_array( $attachments ) ) {
-			foreach ( $attachments as $path ) {
+			foreach ( $attachments as $name => $path ) {
 				$path = (string) $path;
 
-				if ( '' !== $path && file_exists( $path ) ) {
+				if ( '' === $path || ! file_exists( $path ) ) {
+					continue;
+				}
+
+				if ( is_string( $name ) && '' !== $name && ! is_numeric( $name ) ) {
+					$safe_attachments[ sanitize_file_name( $name ) ] = $path;
+				} else {
 					$safe_attachments[] = $path;
 				}
 			}

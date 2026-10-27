@@ -92,6 +92,20 @@ class Oli_CF_Uploads {
 	private static $shutdown_registered = false;
 
 	/**
+	 * Sanitized original filenames keyed by staged path.
+	 *
+	 * @var array<string, string>
+	 */
+	private static $original_names = array();
+
+	/**
+	 * Option that flags a missing private temp directory for admins.
+	 *
+	 * @var string
+	 */
+	const NOTICE_OPTION = 'oli_cf_staging_unavailable';
+
+	/**
 	 * Parse a size string such as "2mb" into bytes.
 	 *
 	 * @param string $size Size string.
@@ -215,30 +229,267 @@ class Oli_CF_Uploads {
 	/**
 	 * Parent directory for per-submission staging folders.
 	 *
-	 * Prefers an off-web temp directory. Never writes directly into
-	 * get_temp_dir() when that path is wp-content/. Falls back to the
-	 * plugin tmp/ folder, which is denied by .htaccess and index.php.
+	 * Only a writable directory whose realpath is outside ABSPATH,
+	 * WP_CONTENT_DIR, and uploads is allowed. There is no plugin tmp/
+	 * fallback. A constant or filter may supply a custom path.
+	 *
+	 * @return string Absolute path or empty string.
+	 */
+	public static function staging_parent() {
+		$custom = self::configured_custom_parent();
+
+		if ( '' !== $custom ) {
+			return self::is_usable_private_temp( $custom ) ? $custom : '';
+		}
+
+		$candidates = array();
+
+		if ( function_exists( 'get_temp_dir' ) ) {
+			$candidates[] = get_temp_dir();
+		}
+
+		$candidates[] = sys_get_temp_dir();
+
+		foreach ( $candidates as $dir ) {
+			if ( self::is_usable_private_temp( $dir ) ) {
+				return self::normalize_dir( $dir );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Whether $dir is a writable private temp (realpath outside the web tree).
+	 *
+	 * @param string $dir Directory.
+	 * @return bool
+	 */
+	public static function is_usable_private_temp( $dir ) {
+		$dir = self::normalize_dir( $dir );
+
+		if ( '' === $dir || ! is_dir( $dir ) || ! is_writable( $dir ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable -- choose an off-web temp dir, not a media path.
+			return false;
+		}
+
+		$real = realpath( $dir );
+
+		if ( false === $real ) {
+			return false;
+		}
+
+		$real = self::normalize_dir( $real );
+
+		foreach ( self::forbidden_web_roots() as $root ) {
+			if ( $real === $root || 0 === strpos( $real . '/', $root . '/' ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Visitor-facing message when uploads cannot be staged.
 	 *
 	 * @return string
 	 */
-	public static function staging_parent() {
-		$sys = self::normalize_dir( sys_get_temp_dir() );
+	public static function unavailable_message() {
+		return __( 'File uploads are unavailable because this site has no private temporary directory. Please contact the site administrator.', 'oli-contact-form' );
+	}
 
-		if ( self::is_off_web_writable( $sys ) ) {
-			return $sys;
+	/**
+	 * Admin notice explaining a missing private temp directory.
+	 *
+	 * @return string
+	 */
+	public static function admin_notice_message() {
+		return __( 'Oli Contact Form cannot store uploaded files: the PHP temporary directory is missing, not writable, or is inside the website directory. Point it to a private directory outside the document root (constant OLI_CF_STAGING_DIR or the oli_cf_staging_parent filter). Forms that accept files will not send until this is fixed.', 'oli-contact-form' );
+	}
+
+	/**
+	 * Remember that staging was refused so admins see a notice.
+	 */
+	public static function flag_unavailable_staging() {
+		if ( function_exists( 'update_option' ) ) {
+			update_option( self::NOTICE_OPTION, time(), false );
+		}
+	}
+
+	/**
+	 * Clear the admin staging notice.
+	 */
+	public static function clear_unavailable_notice() {
+		if ( function_exists( 'delete_option' ) ) {
+			delete_option( self::NOTICE_OPTION );
+		}
+	}
+
+	/**
+	 * Whether the admin notice option is set.
+	 *
+	 * @return bool
+	 */
+	public static function has_unavailable_notice() {
+		if ( ! function_exists( 'get_option' ) ) {
+			return false;
 		}
 
-		$wp_tmp = function_exists( 'get_temp_dir' ) ? self::normalize_dir( get_temp_dir() ) : '';
+		return (bool) get_option( self::NOTICE_OPTION );
+	}
 
-		if ( $wp_tmp && $wp_tmp !== $sys && self::is_off_web_writable( $wp_tmp ) ) {
-			return $wp_tmp;
+	/**
+	 * Whether the submission includes at least one uploaded file.
+	 *
+	 * @param array<string, mixed>             $files  $_FILES-like array.
+	 * @param array<int, array<string, mixed>> $fields Parsed fields.
+	 * @return bool
+	 */
+	public static function submission_has_uploads( $files, $fields ) {
+		if ( ! is_array( $files ) || ! is_array( $fields ) ) {
+			return false;
 		}
 
-		$parent = self::plugin_tmp_dir();
-		self::ensure_directory( $parent );
-		self::protect_directory( $parent );
+		foreach ( $fields as $field ) {
+			if ( empty( $field['type'] ) || 'file' !== $field['type'] || empty( $field['name'] ) ) {
+				continue;
+			}
 
-		return $parent;
+			$name = $field['name'];
+
+			if ( ! empty( $files[ $name ] ) && self::file_was_uploaded( $files[ $name ] ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * wp_mail() attachments: sanitized original name => staged path.
+	 *
+	 * @param string[] $paths Staged paths.
+	 * @return array<string, string>
+	 */
+	public static function mail_attachments( $paths ) {
+		$out = array();
+
+		if ( ! is_array( $paths ) ) {
+			return $out;
+		}
+
+		foreach ( $paths as $path ) {
+			$path = (string) $path;
+
+			if ( '' === $path || ! file_exists( $path ) ) {
+				continue;
+			}
+
+			$name = isset( self::$original_names[ $path ] ) ? self::$original_names[ $path ] : 'attachment.bin';
+
+			if ( isset( $out[ $name ] ) ) {
+				$name = self::unique_suffix() . '-' . $name;
+			}
+
+			$out[ $name ] = $path;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * MIME type from finfo (used to skip core exif_imagetype() on fake images).
+	 *
+	 * @param string $path File path.
+	 * @return string
+	 */
+	public static function file_mime_type( $path ) {
+		$path = (string) $path;
+
+		if ( '' === $path || ! is_readable( $path ) ) {
+			return '';
+		}
+
+		if ( function_exists( 'finfo_file' ) ) {
+			$finfo = finfo_open( FILEINFO_MIME_TYPE );
+			$mime  = $finfo ? (string) finfo_file( $finfo, $path ) : '';
+
+			if ( $finfo ) {
+				finfo_close( $finfo );
+			}
+
+			return strtolower( strtok( $mime, ';' ) );
+		}
+
+		if ( function_exists( 'mime_content_type' ) ) {
+			return strtolower( (string) mime_content_type( $path ) );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Whether the extension is an image type that triggers core exif checks.
+	 *
+	 * @param string $ext Extension.
+	 * @return bool
+	 */
+	public static function extension_expects_image( $ext ) {
+		return in_array( strtolower( (string) $ext ), array( 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp' ), true );
+	}
+
+	/**
+	 * Remove leftover staging from the 0.3.8 plugin tmp/ directory.
+	 */
+	public static function purge_legacy_plugin_tmp() {
+		$dir = self::plugin_tmp_dir();
+
+		if ( '' === $dir || ! is_dir( $dir ) ) {
+			return;
+		}
+
+		$matches = glob( $dir . '/oli-cf-*' );
+
+		if ( is_array( $matches ) ) {
+			foreach ( $matches as $path ) {
+				if ( is_dir( $path ) ) {
+					self::delete_staging_directory( $path );
+				} else {
+					self::delete_file( $path );
+				}
+			}
+		}
+
+		foreach ( array( $dir . '/index.php', $dir . '/.htaccess' ) as $stub ) {
+			if ( is_file( $stub ) ) {
+				self::delete_file( $stub );
+			}
+		}
+
+		$left = @scandir( $dir ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- directory may already be gone.
+
+		if ( is_array( $left ) && array( '.', '..' ) === array_values( array_intersect( $left, array( '.', '..' ) ) ) && 2 === count( $left ) ) {
+			@rmdir( $dir ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- remove empty leftover plugin tmp/.
+		}
+	}
+
+	/**
+	 * Run upgrade tasks once per version.
+	 */
+	public static function maybe_upgrade() {
+		if ( ! function_exists( 'get_option' ) || ! defined( 'OLI_CF_VERSION' ) ) {
+			return;
+		}
+
+		if ( (string) get_option( 'oli_cf_db_version', '' ) === OLI_CF_VERSION ) {
+			return;
+		}
+
+		self::purge_legacy_plugin_tmp();
+
+		if ( function_exists( 'update_option' ) ) {
+			update_option( 'oli_cf_db_version', OLI_CF_VERSION );
+		}
 	}
 
 	/**
@@ -264,12 +515,6 @@ class Oli_CF_Uploads {
 			return '';
 		}
 
-		self::ensure_directory( $parent );
-
-		if ( self::is_inside_web_root( $parent ) ) {
-			self::protect_directory( $parent );
-		}
-
 		for ( $i = 0; $i < 5; $i++ ) {
 			$dir = $parent . '/oli-cf-' . self::unique_suffix();
 
@@ -277,12 +522,14 @@ class Oli_CF_Uploads {
 				continue;
 			}
 
-			if ( ! self::ensure_directory( $dir ) ) {
+			if ( ! @mkdir( $dir, 0700 ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_mkdir -- private 0700 staging; wp_mkdir_p() inherits 1777 from /tmp.
 				continue;
 			}
 
-			if ( self::is_inside_web_root( $dir ) ) {
-				self::protect_directory( $dir );
+			self::try_chmod( $dir, 0700 );
+
+			if ( ! is_dir( $dir ) ) {
+				continue;
 			}
 
 			return $dir;
@@ -313,6 +560,15 @@ class Oli_CF_Uploads {
 		}
 
 		$original = isset( $file['name'] ) ? sanitize_file_name( $file['name'] ) : 'upload';
+		$ext      = strtolower( pathinfo( $original, PATHINFO_EXTENSION ) );
+
+		if ( '' !== $ext && self::extension_expects_image( $ext ) ) {
+			$mime = self::file_mime_type( $tmp );
+
+			if ( '' !== $mime && 0 !== strpos( $mime, 'image/' ) ) {
+				return '';
+			}
+		}
 
 		if ( function_exists( 'wp_check_filetype_and_ext' ) ) {
 			$checked = wp_check_filetype_and_ext( $tmp, $original );
@@ -336,15 +592,17 @@ class Oli_CF_Uploads {
 			return '';
 		}
 
-		$dest = $dest_dir . '/' . $original;
+		$dest = $dest_dir . '/' . self::random_bin_name();
 
 		if ( file_exists( $dest ) ) {
-			$dest = $dest_dir . '/' . self::unique_suffix() . '-' . $original;
+			$dest = $dest_dir . '/' . self::random_bin_name();
 		}
 
 		if ( ! self::relocate_uploaded_file( $tmp, $dest ) ) {
 			return '';
 		}
+
+		self::$original_names[ $dest ] = $original;
 
 		return $dest;
 	}
@@ -624,7 +882,7 @@ class Oli_CF_Uploads {
 		if ( function_exists( 'get_temp_dir' ) ) {
 			$wp_tmp = self::normalize_dir( get_temp_dir() );
 
-			if ( '' !== $wp_tmp && $wp_tmp !== $sys && ! self::is_wp_content_dir( $wp_tmp ) ) {
+			if ( '' !== $wp_tmp && $wp_tmp !== $sys && is_dir( $wp_tmp ) && self::is_usable_private_temp( $wp_tmp ) ) {
 				$roots[] = $wp_tmp;
 			}
 		}
@@ -633,6 +891,12 @@ class Oli_CF_Uploads {
 
 		if ( is_dir( $plugin_tmp ) ) {
 			$roots[] = $plugin_tmp;
+		}
+
+		$custom = self::configured_custom_parent();
+
+		if ( '' !== $custom && is_dir( $custom ) ) {
+			$roots[] = $custom;
 		}
 
 		return array_values( array_unique( $roots ) );
@@ -657,6 +921,7 @@ class Oli_CF_Uploads {
 			return false;
 		}
 
+		self::try_chmod( $dest, 0600 );
 		self::delete_file( $tmp );
 
 		return true;
@@ -682,119 +947,97 @@ class Oli_CF_Uploads {
 	}
 
 	/**
-	 * Writable directory that is not under the web root or wp-content.
-	 *
-	 * @param string $dir Directory.
-	 * @return bool
-	 */
-	private static function is_off_web_writable( $dir ) {
-		$dir = self::normalize_dir( $dir );
-
-		if ( '' === $dir || ! is_dir( $dir ) || ! is_writable( $dir ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable -- off-web temp dir, not a media path.
-			return false;
-		}
-
-		return ! self::is_inside_web_root( $dir ) && ! self::is_wp_content_dir( $dir );
-	}
-
-	/**
-	 * Whether $dir is WP_CONTENT_DIR (get_temp_dir() fallback).
-	 *
-	 * @param string $dir Directory.
-	 * @return bool
-	 */
-	private static function is_wp_content_dir( $dir ) {
-		$dir = self::normalize_dir( $dir );
-
-		if ( '' === $dir || ! defined( 'WP_CONTENT_DIR' ) ) {
-			return false;
-		}
-
-		$content = self::normalize_dir( WP_CONTENT_DIR );
-
-		return '' !== $content && ( $dir === $content || 0 === strpos( $dir . '/', $content . '/' ) );
-	}
-
-	/**
-	 * Whether $dir lives under ABSPATH.
-	 *
-	 * @param string $dir Directory.
-	 * @return bool
-	 */
-	private static function is_inside_web_root( $dir ) {
-		$dir = self::normalize_dir( $dir );
-
-		if ( '' === $dir || ! defined( 'ABSPATH' ) ) {
-			return false;
-		}
-
-		$abs = self::normalize_dir( ABSPATH );
-
-		if ( '' === $abs ) {
-			return false;
-		}
-
-		return $dir === $abs || 0 === strpos( $dir . '/', $abs . '/' );
-	}
-
-	/**
-	 * Create a directory if needed.
-	 *
-	 * @param string $dir Directory.
-	 * @return bool
-	 */
-	private static function ensure_directory( $dir ) {
-		$dir = self::normalize_dir( $dir );
-
-		if ( '' === $dir ) {
-			return false;
-		}
-
-		if ( is_dir( $dir ) ) {
-			return true;
-		}
-
-		if ( function_exists( 'wp_mkdir_p' ) ) {
-			return (bool) wp_mkdir_p( $dir );
-		}
-
-		return @mkdir( $dir, 0755, true ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_mkdir -- private staging fallback when wp_mkdir_p() is absent.
-	}
-
-	/**
-	 * Write Apache deny rules and a silent index.php.
-	 *
-	 * @param string $dir Directory.
-	 */
-	private static function protect_directory( $dir ) {
-		$dir = self::normalize_dir( $dir );
-
-		if ( '' === $dir || ! is_dir( $dir ) ) {
-			return;
-		}
-
-		$index = $dir . '/index.php';
-
-		if ( ! file_exists( $index ) ) {
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- one-time deny stub, not user content.
-			file_put_contents( $index, "<?php\n// Silence is golden.\n" );
-		}
-
-		$htaccess = $dir . '/.htaccess';
-
-		if ( ! file_exists( $htaccess ) ) {
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Apache deny rules for a private staging dir.
-			file_put_contents( $htaccess, self::deny_htaccess() );
-		}
-	}
-
-	/**
-	 * Apache 2.2 + 2.4 deny-all rules.
+	 * Custom staging parent from constant or filter (unvalidated).
 	 *
 	 * @return string
 	 */
-	private static function deny_htaccess() {
-		return "<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nOrder deny,allow\nDeny from all\n</IfModule>\n";
+	private static function configured_custom_parent() {
+		$custom = null;
+
+		if ( defined( 'OLI_CF_STAGING_DIR' ) && is_string( OLI_CF_STAGING_DIR ) && '' !== OLI_CF_STAGING_DIR ) {
+			$custom = OLI_CF_STAGING_DIR;
+		}
+
+		if ( function_exists( 'apply_filters' ) ) {
+			$custom = apply_filters( 'oli_cf_staging_parent', $custom );
+		}
+
+		return is_string( $custom ) ? self::normalize_dir( $custom ) : '';
+	}
+
+	/**
+	 * Real paths that must never hold staged uploads.
+	 *
+	 * @return string[]
+	 */
+	private static function forbidden_web_roots() {
+		$roots = array();
+		$raw   = array();
+
+		if ( defined( 'ABSPATH' ) ) {
+			$raw[] = ABSPATH;
+		}
+
+		if ( defined( 'WP_CONTENT_DIR' ) ) {
+			$raw[] = WP_CONTENT_DIR;
+		}
+
+		if ( function_exists( 'wp_upload_dir' ) ) {
+			$uploads = wp_upload_dir();
+
+			if ( is_array( $uploads ) && ! empty( $uploads['basedir'] ) ) {
+				$raw[] = $uploads['basedir'];
+			}
+		}
+
+		foreach ( $raw as $path ) {
+			$real = realpath( $path );
+
+			if ( false === $real ) {
+				$normalized = self::normalize_dir( $path );
+
+				if ( '' !== $normalized ) {
+					$roots[] = $normalized;
+				}
+
+				continue;
+			}
+
+			$roots[] = self::normalize_dir( $real );
+		}
+
+		return array_values( array_unique( $roots ) );
+	}
+
+	/**
+	 * chmod that never fatals.
+	 *
+	 * @param string $path Path.
+	 * @param int    $mode Mode.
+	 */
+	private static function try_chmod( $path, $mode ) {
+		if ( ! file_exists( $path ) ) {
+			return;
+		}
+
+		@chmod( $path, $mode ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- 0700/0600 when the filesystem allows it.
+	}
+
+	/**
+	 * Random staging filename with no original name or extension.
+	 *
+	 * @return string
+	 */
+	private static function random_bin_name() {
+		try {
+			return bin2hex( random_bytes( 16 ) ) . '.bin';
+		} catch ( Exception $e ) {
+			if ( function_exists( 'wp_generate_password' ) ) {
+				return wp_generate_password( 32, false, false ) . '.bin';
+			}
+
+			return (string) mt_rand( 100000, 999999 ) . '.bin'; // phpcs:ignore WordPress.WP.AlternativeFunctions.rand_mt_rand -- fallback when random_bytes() is unavailable.
+		}
 	}
 
 	/**

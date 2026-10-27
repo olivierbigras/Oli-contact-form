@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.8
+Stable tag: 0.3.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -131,6 +131,11 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 == Changelog ==
 
+= 0.3.9 =
+* Uploaded files are staged only in a private temp directory outside the web root (0700 / 0600, random .bin name). There is no plugin tmp/ fallback.
+* If no private temp directory is available, a form with an attached file is refused (no copy, no email) and administrators see a dismissible notice.
+* Updating removes leftover files from the old plugin tmp/ directory.
+
 = 0.3.8 =
 * Uploaded files are staged in a private random directory, attached, then deleted in a try/finally (plus shutdown and hourly leftover cleanup). A file is never kept on the server.
 * Staging requires is_uploaded_file(). Real type is checked with wp_check_filetype_and_ext in addition to the allowed extension.
@@ -201,6 +206,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.9 =
+File uploads require a private temp directory outside the web root. Forms with attachments are refused if none is available.
 
 = 0.3.8 =
 Uploaded files are attached then deleted even if mail hooks throw. Spoofed file types are rejected.

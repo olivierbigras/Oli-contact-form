@@ -67,6 +67,15 @@ if ( class_exists( '\PHPUnit\Framework\TestCase' ) ) {
 		protected function assertStringContainsString( $needle, $haystack, $message = '' ) {
 			oli_cf_assert_true( false !== strpos( (string) $haystack, (string) $needle ), '' !== $message ? $message : 'assertStringContainsString' );
 		}
+
+		/**
+		 * @param string|int $key     Key.
+		 * @param array      $array   Array.
+		 * @param string     $message Message.
+		 */
+		protected function assertArrayHasKey( $key, $array, $message = '' ) {
+			oli_cf_assert_true( is_array( $array ) && array_key_exists( $key, $array ), '' !== $message ? $message : 'assertArrayHasKey' );
+		}
 	}
 }
 
@@ -85,6 +94,7 @@ class UploadCleanupTest extends Oli_CF_Upload_Cleanup_TestCase {
 		$GLOBALS['oli_cf_test_wp_mail_calls']     = array();
 		$GLOBALS['oli_cf_test_wp_mail_fail']      = false;
 		$GLOBALS['oli_cf_test_wp_mail_exception'] = '';
+		$GLOBALS['oli_cf_test_options']           = array();
 		unset( $GLOBALS['oli_cf_test_temp_dir'] );
 	}
 
@@ -230,9 +240,12 @@ class UploadCleanupTest extends Oli_CF_Upload_Cleanup_TestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertTrue( $existed_at_send );
 		$this->assertFalse( empty( $captured['your-file'] ) );
+		$this->assertSame( 'bin', pathinfo( $captured['your-file'], PATHINFO_EXTENSION ) );
 		$this->assertFileDoesNotExist( $captured['your-file'] );
 		$this->assertFalse( is_dir( dirname( $captured['your-file'] ) ) );
 		$this->assertFalse( file_exists( $upload['path'] ) );
+		$this->assertFalse( empty( $GLOBALS['oli_cf_test_wp_mail_calls'] ) );
+		$this->assertArrayHasKey( 'notes.txt', $GLOBALS['oli_cf_test_wp_mail_calls'][0]['attachments'] );
 	}
 
 	/**
@@ -328,6 +341,181 @@ class UploadCleanupTest extends Oli_CF_Upload_Cleanup_TestCase {
 		$this->assertFileExists( $upload['path'] );
 
 		unlink( $upload['path'] );
+	}
+
+	/**
+	 * Staging dir is 0700 and the file is 0600 when the filesystem allows it.
+	 */
+	public function test_staging_permissions_are_private() {
+		$this->allow_local_uploads();
+		$upload = $this->make_file( 'notes.txt', 'hello attachment' );
+		$staged = Oli_CF_Uploads::stage_file( $upload['file'] );
+
+		$this->assertTrue( is_string( $staged ) && '' !== $staged );
+		$this->assertFileExists( $staged );
+
+		$dir = dirname( $staged );
+		$this->assert_mode_when_supported( $dir, 0700 );
+		$this->assert_mode_when_supported( $staged, 0600 );
+
+		Oli_CF_Uploads::cleanup_submission( $dir, array( $staged ) );
+	}
+
+	/**
+	 * Staged path is random .bin; wp_mail keeps the original name.
+	 */
+	public function test_random_staging_name_and_original_mail_name() {
+		$this->allow_local_uploads();
+		$upload = $this->make_file( 'notes.txt', 'hello attachment' );
+		$staged = Oli_CF_Uploads::stage_file( $upload['file'] );
+
+		$this->assertSame( 'bin', pathinfo( $staged, PATHINFO_EXTENSION ) );
+		$this->assertSame( 32, strlen( pathinfo( $staged, PATHINFO_FILENAME ) ) );
+		$this->assertFalse( false !== strpos( basename( $staged ), 'notes' ) );
+		$this->assertSame( array( 'notes.txt' => $staged ), Oli_CF_Uploads::mail_attachments( array( $staged ) ) );
+
+		Oli_CF_Uploads::cleanup_submission( dirname( $staged ), array( $staged ) );
+	}
+
+	/**
+	 * A temp directory under ABSPATH refuses the upload: no copy, no mail, admin notice.
+	 */
+	public function test_web_root_temp_refuses_upload() {
+		$this->allow_local_uploads();
+		$this->seed_form();
+
+		$web = rtrim( ABSPATH, '/\\' ) . '/oli-cf-web-temp';
+		if ( ! is_dir( $web ) ) {
+			mkdir( $web, 0700, true );
+		}
+
+		add_filter(
+			'oli_cf_staging_parent',
+			static function () use ( $web ) {
+				return $web;
+			}
+		);
+
+		$upload = $this->make_file( 'notes.txt', 'hello attachment' );
+		$before = $this->list_files( $web );
+
+		$handler = new Oli_CF_Submission();
+		$result  = $handler->process_submission(
+			12,
+			array( 'your-name' => 'Ada' ),
+			array( 'your-file' => $upload['file'] )
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( Oli_CF_Uploads::unavailable_message(), $result['message'] );
+		$this->assertSame( $before, $this->list_files( $web ) );
+		$this->assertFileExists( $upload['path'] );
+		$this->assertTrue( empty( $GLOBALS['oli_cf_test_wp_mail_calls'] ) );
+		$this->assertTrue( Oli_CF_Uploads::has_unavailable_notice() );
+
+		unlink( $upload['path'] );
+		@rmdir( $web ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+	}
+
+	/**
+	 * An unwritable private temp refuses the upload the same way.
+	 */
+	public function test_unwritable_temp_refuses_upload() {
+		$this->allow_local_uploads();
+		$this->seed_form();
+
+		$locked = sys_get_temp_dir() . '/oli-cf-locked-' . wp_generate_password( 8, false, false );
+		mkdir( $locked, 0700, true );
+		chmod( $locked, 0555 );
+
+		add_filter(
+			'oli_cf_staging_parent',
+			static function () use ( $locked ) {
+				return $locked;
+			}
+		);
+
+		$upload = $this->make_file( 'notes.txt', 'hello attachment' );
+
+		$handler = new Oli_CF_Submission();
+		$result  = $handler->process_submission(
+			12,
+			array( 'your-name' => 'Ada' ),
+			array( 'your-file' => $upload['file'] )
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( Oli_CF_Uploads::unavailable_message(), $result['message'] );
+		$this->assertFileExists( $upload['path'] );
+		$this->assertTrue( empty( $GLOBALS['oli_cf_test_wp_mail_calls'] ) );
+		$this->assertTrue( Oli_CF_Uploads::has_unavailable_notice() );
+		$this->assertSame( array(), $this->list_files( $locked ) );
+
+		unlink( $upload['path'] );
+		chmod( $locked, 0700 );
+		@rmdir( $locked ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+	}
+
+	/**
+	 * The default /tmp parent is accepted and a send succeeds.
+	 */
+	public function test_private_tmp_parent_allows_send() {
+		$this->allow_local_uploads();
+		$this->seed_form();
+
+		$parent = Oli_CF_Uploads::staging_parent();
+		$this->assertTrue( Oli_CF_Uploads::is_usable_private_temp( $parent ) );
+		$this->assertFalse( 0 === strpos( $parent . '/', rtrim( ABSPATH, '/\\' ) . '/' ) );
+
+		$upload  = $this->make_file( 'notes.txt', 'hello attachment' );
+		$handler = new Oli_CF_Submission();
+		$result  = $handler->process_submission(
+			12,
+			array( 'your-name' => 'Ada' ),
+			array( 'your-file' => $upload['file'] )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertFalse( empty( $GLOBALS['oli_cf_test_wp_mail_calls'] ) );
+		$this->assertArrayHasKey( 'notes.txt', $GLOBALS['oli_cf_test_wp_mail_calls'][0]['attachments'] );
+		$this->assertFalse( Oli_CF_Uploads::has_unavailable_notice() );
+	}
+
+	/**
+	 * Assert octal permissions when the filesystem honors chmod.
+	 *
+	 * @param string $path     Path.
+	 * @param int    $expected Mode.
+	 */
+	private function assert_mode_when_supported( $path, $expected ) {
+		clearstatcache( true, $path );
+		$mode = fileperms( $path ) & 0777;
+
+		if ( $mode === $expected ) {
+			$this->assertSame( $expected, $mode );
+			return;
+		}
+
+		$this->assertTrue( file_exists( $path ) );
+	}
+
+	/**
+	 * Relative filenames inside a directory (excluding . and ..).
+	 *
+	 * @param string $dir Directory.
+	 * @return string[]
+	 */
+	private function list_files( $dir ) {
+		$items = is_dir( $dir ) ? scandir( $dir ) : array();
+
+		return array_values(
+			array_filter(
+				is_array( $items ) ? $items : array(),
+				static function ( $item ) {
+					return '.' !== $item && '..' !== $item;
+				}
+			)
+		);
 	}
 }
 
