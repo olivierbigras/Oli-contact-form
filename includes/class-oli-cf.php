@@ -121,7 +121,7 @@ class Oli_CF {
 		$this->loader->add_action( Oli_CF_Uploads::PURGE_CRON_HOOK, $submission, 'purge_stale_uploads' );
 		$this->loader->add_action( 'wp_ajax_oli_cf_submit_form', $submission, 'handle_ajax_submission' );
 		$this->loader->add_action( 'wp_ajax_nopriv_oli_cf_submit_form', $submission, 'handle_ajax_submission' );
-		$this->loader->add_action( 'init', $submission, 'handle_non_ajax_submission' );
+		$this->loader->add_action( 'wp_loaded', $submission, 'handle_non_ajax_submission' );
 	}
 
 	/**

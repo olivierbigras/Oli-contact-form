@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Échappement tardif : le gabarit du formulaire et le widget reCAPTCHA passent par `wp_kses()` avec une liste blanche explicite à l'affichage.
 - Désinstallation : requête sur la table des options avec `%i`.
 
+### Corrigé
+- Le pot de miel et les jetons reCAPTCHA/Turnstile étaient retirés des données avant le contrôle anti-spam (depuis 0.3.3) : un pot de miel rempli n'était pas rejeté, et un captcha activé avec clé secrète refusait tous les envois. Ils sont de nouveau vérifiés.
+- Le repli sans JavaScript s'exécute sur `wp_loaded` au lieu de `init` : un refus (nonce invalide) ne déclenche plus d'avis WooCommerce « appelé trop tôt ».
+
 ### Notes
 - Version 0.3.11 sautée (réservée à une version de travail non publiée).
 

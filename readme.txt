@@ -137,6 +137,8 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Security: mail settings are read through filter_input() and sanitized field by field, without bypassing the input checks.
 * Late escaping: the form markup and the reCAPTCHA widget are escaped with wp_kses() and an explicit allow-list at output.
 * Uninstall uses the %i identifier placeholder for the options table.
+* Fix: the honeypot and the reCAPTCHA/Turnstile tokens were removed from the data before the anti-spam check (since 0.3.3), so a filled honeypot was not rejected and an enabled captcha with a secret key rejected every submission. They are now checked again.
+* The no-JavaScript fallback now runs on wp_loaded instead of init, so a rejected request no longer triggers WooCommerce "called too early" notices.
 
 = 0.3.10 =
 * Readme: clearer short description.
@@ -218,7 +220,7 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 == Upgrade Notice ==
 
 = 0.3.12 =
-Security hardening (nonce checks on admin notices, late escaping of form output). No settings change.
+Fixes the honeypot and captcha checks, plus security hardening (nonce checks on admin notices, late escaping of form output). No settings change.
 
 = 0.3.10 =
 Readme: clearer short description.

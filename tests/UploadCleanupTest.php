@@ -517,6 +517,61 @@ class UploadCleanupTest extends Oli_CF_Upload_Cleanup_TestCase {
 			)
 		);
 	}
+	/**
+	 * A filled honeypot is rejected by process_submission() and nothing is sent (0.3.12).
+	 */
+	public function test_filled_honeypot_blocks_submission() {
+		$this->seed_form();
+		$sent = false;
+		add_action(
+			'oli_cf_before_send',
+			static function () use ( &$sent ) {
+				$sent = true;
+			}
+		);
+
+		$handler = new Oli_CF_Submission();
+		$result  = $handler->process_submission(
+			12,
+			array(
+				'your-name' => 'Ada',
+				'oli_cf_hp' => 'bot',
+			),
+			array()
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'spam', $result['status'] );
+		$this->assertFalse( $sent );
+		$this->assertFalse( isset( $result['values']['oli_cf_hp'] ) );
+	}
+
+	/**
+	 * An empty honeypot still lets a valid submission through (0.3.12).
+	 */
+	public function test_empty_honeypot_still_sends() {
+		$this->seed_form();
+		$sent = false;
+		add_action(
+			'oli_cf_before_send',
+			static function () use ( &$sent ) {
+				$sent = true;
+			}
+		);
+
+		$handler = new Oli_CF_Submission();
+		$handler->process_submission(
+			12,
+			array(
+				'your-name' => 'Ada',
+				'oli_cf_hp' => '',
+			),
+			array()
+		);
+
+		$this->assertTrue( $sent );
+	}
+
 }
 
 if ( isset( $argv[0] ) && is_string( $argv[0] ) && realpath( $argv[0] ) === realpath( __FILE__ ) ) {

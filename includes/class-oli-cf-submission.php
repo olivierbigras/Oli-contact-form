@@ -331,7 +331,16 @@ class Oli_CF_Submission {
 		 */
 		do_action( 'oli_cf_before_validation', $form_id, $data, $files );
 
-		$spam_check = Oli_CF_Anti_Spam::check( $data );
+		// sanitize_posted_data() drops the honeypot and captcha tokens (they are not mail fields),
+		// so hand them to the anti-spam check separately.
+		$spam_data = $data;
+		foreach ( array( 'oli_cf_hp', 'g-recaptcha-response', 'cf-turnstile-response' ) as $spam_key ) {
+			if ( isset( $post[ $spam_key ] ) && is_scalar( $post[ $spam_key ] ) ) {
+				$spam_data[ $spam_key ] = sanitize_text_field( (string) $post[ $spam_key ] );
+			}
+		}
+
+		$spam_check = Oli_CF_Anti_Spam::check( $spam_data );
 
 		if ( is_array( $spam_check ) ) {
 			return array(
