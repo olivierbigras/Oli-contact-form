@@ -18,6 +18,9 @@ class Oli_CF_Activator {
 	 * Activate the plugin.
 	 */
 	public static function activate() {
+		require_once plugin_dir_path( __FILE__ ) . 'class-oli-cf-uploads.php';
+		Oli_CF_Uploads::maybe_schedule_purge();
+
 		flush_rewrite_rules();
 
 		require_once plugin_dir_path( __DIR__ ) . 'admin/class-oli-cf-settings.php';

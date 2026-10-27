@@ -285,6 +285,26 @@ class Oli_CF_Validator {
 			);
 		}
 
+		$tmp = isset( $file['tmp_name'] ) ? (string) $file['tmp_name'] : '';
+
+		if ( '' !== $tmp && is_file( $tmp ) && ! Oli_CF_Uploads::is_real_uploaded_file( $tmp ) ) {
+			return $messages['upload_failed'];
+		}
+
+		if ( '' !== $tmp && is_readable( $tmp ) && function_exists( 'wp_check_filetype_and_ext' ) ) {
+			$checked   = wp_check_filetype_and_ext( $tmp, isset( $file['name'] ) ? (string) $file['name'] : '' );
+			$real_ext  = ( ! empty( $checked['ext'] ) && is_string( $checked['ext'] ) ) ? strtolower( $checked['ext'] ) : '';
+			$real_type = ( ! empty( $checked['type'] ) && is_string( $checked['type'] ) ) ? $checked['type'] : '';
+
+			if ( '' === $real_ext || '' === $real_type || $real_ext !== $ext ) {
+				return $messages['upload_file_type'];
+			}
+
+			if ( ! empty( $allowed ) && ! in_array( $real_ext, $allowed, true ) ) {
+				return $messages['upload_file_type'];
+			}
+		}
+
 		return false;
 	}
 }

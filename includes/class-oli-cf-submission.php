@@ -25,6 +25,20 @@ class Oli_CF_Submission {
 	const FEEDBACK_TTL = 300;
 
 	/**
+	 * Schedule hourly leftover upload cleanup.
+	 */
+	public function maybe_schedule_stale_upload_purge() {
+		Oli_CF_Uploads::maybe_schedule_purge();
+	}
+
+	/**
+	 * Cron callback: delete leftover staging older than one hour.
+	 */
+	public function purge_stale_uploads() {
+		Oli_CF_Uploads::purge_stale_staging();
+	}
+
+	/**
 	 * Handle AJAX form submission.
 	 */
 	public function handle_ajax_submission() {
@@ -340,20 +354,36 @@ class Oli_CF_Submission {
 			);
 		}
 
-		$staged = Oli_CF_Uploads::stage_files( $files, $fields );
+		Oli_CF_Uploads::purge_stale_staging();
+		Oli_CF_Uploads::maybe_schedule_purge();
 
-		/**
-		 * Fires before sending mail.
-		 *
-		 * @param int                  $form_id Form ID.
-		 * @param array<string, mixed> $data    Sanitized posted data.
-		 * @param string[]             $staged  Staged attachment paths.
-		 */
-		do_action( 'oli_cf_before_send', $form_id, $data, $staged );
+		$staged = array();
+		$dir    = '';
+		$sent   = false;
 
-		$sent = Oli_CF_Mailer::send( $form_id, $data, array_values( $staged ) );
+		try {
+			$dir = Oli_CF_Uploads::create_staging_directory();
+			Oli_CF_Uploads::track_for_shutdown( $dir );
 
-		Oli_CF_Uploads::delete_files( $staged );
+			$staged = Oli_CF_Uploads::stage_files( $files, $fields, $dir );
+			Oli_CF_Uploads::track_for_shutdown( $dir, $staged );
+
+			/**
+			 * Fires before sending mail.
+			 *
+			 * @param int                  $form_id Form ID.
+			 * @param array<string, mixed> $data    Sanitized posted data.
+			 * @param string[]             $staged  Staged attachment paths.
+			 */
+			do_action( 'oli_cf_before_send', $form_id, $data, $staged );
+
+			$sent = Oli_CF_Mailer::send( $form_id, $data, array_values( $staged ) );
+		} catch ( Throwable $e ) {
+			unset( $e );
+			$sent = false;
+		} finally {
+			Oli_CF_Uploads::cleanup_submission( $dir, $staged );
+		}
 
 		if ( ! $sent ) {
 			return array(

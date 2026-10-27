@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.7
+Stable tag: 0.3.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -131,6 +131,11 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 == Changelog ==
 
+= 0.3.8 =
+* Uploaded files are staged in a private random directory, attached, then deleted in a try/finally (plus shutdown and hourly leftover cleanup). A file is never kept on the server.
+* Staging requires is_uploaded_file(). Real type is checked with wp_check_filetype_and_ext in addition to the allowed extension.
+* Uninstall deletes oli_cf_fb_* feedback transients (and their timeouts), including on multisite.
+
 = 0.3.7 =
 * Saving mail settings keeps angle brackets around field tags and email addresses (From: [your-name] <[your-email]>). Real HTML tags are stripped. Single-line headers still drop CR/LF.
 
@@ -196,6 +201,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.8 =
+Uploaded files are attached then deleted even if mail hooks throw. Spoofed file types are rejected.
 
 = 0.3.7 =
 Saving a form no longer strips <[your-email]> from the default notification body.

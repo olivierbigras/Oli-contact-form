@@ -5,6 +5,13 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8] - 2026-10-27
+
+### Security
+- Les fichiers téléversés passent par un dossier temporaire privé à nom aléatoire, sont joints au courriel, puis sont toujours supprimés (`try/finally`, `register_shutdown_function`, purge des restes de plus d’une heure au prochain envoi et par cron).
+- `is_uploaded_file()` est exigé avant toute copie. `wp_check_filetype_and_ext` complète la liste d’extensions. Les fichiers ne sont jamais écrits directement dans `get_temp_dir()` lorsque celui-ci vaut `wp-content/`.
+- `uninstall.php` supprime les transients `oli_cf_fb_*` (et `_timeout`), y compris en multisite.
+
 ## [0.3.7] - 2026-10-26
 
 ### Fixed

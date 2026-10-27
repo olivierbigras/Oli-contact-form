@@ -9,6 +9,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+if ( ! defined( 'WP_CONTENT_DIR' ) ) {
+	define( 'WP_CONTENT_DIR', __DIR__ . '/fake-wp-content' );
+}
+
+if ( ! defined( 'OLI_CF_PLUGIN_DIR' ) ) {
+	define( 'OLI_CF_PLUGIN_DIR', dirname( __DIR__ ) . '/' );
+}
+
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+	define( 'HOUR_IN_SECONDS', 3600 );
+}
+
 if ( ! defined( 'UPLOAD_ERR_OK' ) ) {
 	define( 'UPLOAD_ERR_OK', 0 );
 }
@@ -488,7 +500,274 @@ if ( ! function_exists( 'get_temp_dir' ) ) {
 	 * @return string
 	 */
 	function get_temp_dir() {
+		if ( isset( $GLOBALS['oli_cf_test_temp_dir'] ) ) {
+			return (string) $GLOBALS['oli_cf_test_temp_dir'];
+		}
+
 		return sys_get_temp_dir();
+	}
+}
+
+if ( ! function_exists( 'wp_normalize_path' ) ) {
+	/**
+	 * @param string $path Path.
+	 * @return string
+	 */
+	function wp_normalize_path( $path ) {
+		$path = str_replace( '\\', '/', (string) $path );
+
+		return preg_replace( '#/+#', '/', $path );
+	}
+}
+
+if ( ! function_exists( 'wp_mkdir_p' ) ) {
+	/**
+	 * @param string $target Target.
+	 * @return bool
+	 */
+	function wp_mkdir_p( $target ) {
+		return is_dir( $target ) || mkdir( $target, 0755, true );
+	}
+}
+
+if ( ! function_exists( 'add_filter' ) ) {
+	/**
+	 * @param string   $hook          Hook.
+	 * @param callable $callback      Callback.
+	 * @param int      $priority      Priority.
+	 * @param int      $accepted_args Args.
+	 */
+	function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+		unset( $priority, $accepted_args );
+		$GLOBALS['oli_cf_test_filters'][ (string) $hook ][] = $callback;
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	/**
+	 * @param string $hook  Hook.
+	 * @param mixed  $value Value.
+	 * @param mixed  ...$args Extra args.
+	 * @return mixed
+	 */
+	function apply_filters( $hook, $value, ...$args ) {
+		if ( empty( $GLOBALS['oli_cf_test_filters'][ (string) $hook ] ) ) {
+			return $value;
+		}
+
+		foreach ( $GLOBALS['oli_cf_test_filters'][ (string) $hook ] as $callback ) {
+			$value = call_user_func_array( $callback, array_merge( array( $value ), $args ) );
+		}
+
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'add_action' ) ) {
+	/**
+	 * @param string   $hook          Hook.
+	 * @param callable $callback      Callback.
+	 * @param int      $priority      Priority.
+	 * @param int      $accepted_args Args.
+	 */
+	function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+		add_filter( $hook, $callback, $priority, $accepted_args );
+	}
+}
+
+if ( ! function_exists( 'do_action' ) ) {
+	/**
+	 * @param string $hook Hook.
+	 * @param mixed  ...$args Args.
+	 */
+	function do_action( $hook, ...$args ) {
+		if ( empty( $GLOBALS['oli_cf_test_filters'][ (string) $hook ] ) ) {
+			return;
+		}
+
+		foreach ( $GLOBALS['oli_cf_test_filters'][ (string) $hook ] as $callback ) {
+			call_user_func_array( $callback, $args );
+		}
+	}
+}
+
+if ( ! function_exists( 'get_post' ) ) {
+	/**
+	 * @param int $id ID.
+	 * @return object|null
+	 */
+	function get_post( $id ) {
+		$id = (int) $id;
+
+		return isset( $GLOBALS['oli_cf_test_posts'][ $id ] ) ? $GLOBALS['oli_cf_test_posts'][ $id ] : null;
+	}
+}
+
+if ( ! function_exists( 'get_post_meta' ) ) {
+	/**
+	 * @param int    $id     ID.
+	 * @param string $key    Key.
+	 * @param bool   $single Single.
+	 * @return mixed
+	 */
+	function get_post_meta( $id, $key = '', $single = false ) {
+		$id = (int) $id;
+
+		if ( isset( $GLOBALS['oli_cf_test_meta'][ $id ][ $key ] ) ) {
+			return $GLOBALS['oli_cf_test_meta'][ $id ][ $key ];
+		}
+
+		return $single ? '' : array();
+	}
+}
+
+if ( ! function_exists( 'wp_mail' ) ) {
+	/**
+	 * @param string|string[] $to          To.
+	 * @param string          $subject     Subject.
+	 * @param string          $message     Message.
+	 * @param string|string[] $headers     Headers.
+	 * @param string|string[] $attachments Attachments.
+	 * @return bool
+	 */
+	function wp_mail( $to, $subject, $message, $headers = '', $attachments = array() ) {
+		if ( ! empty( $GLOBALS['oli_cf_test_wp_mail_exception'] ) ) {
+			throw new RuntimeException( (string) $GLOBALS['oli_cf_test_wp_mail_exception'] );
+		}
+
+		do_action( 'phpmailer_init', (object) array() );
+		do_action(
+			'wp_mail',
+			array(
+				'to'          => $to,
+				'subject'     => $subject,
+				'message'     => $message,
+				'headers'     => $headers,
+				'attachments' => $attachments,
+			)
+		);
+
+		$GLOBALS['oli_cf_test_wp_mail_calls'][] = array(
+			'to'          => $to,
+			'subject'     => $subject,
+			'message'     => $message,
+			'headers'     => $headers,
+			'attachments' => $attachments,
+		);
+
+		return empty( $GLOBALS['oli_cf_test_wp_mail_fail'] );
+	}
+}
+
+if ( ! function_exists( 'wp_check_filetype_and_ext' ) ) {
+	/**
+	 * @param string $file     File path.
+	 * @param string $filename Filename.
+	 * @param array  $mimes    Mimes.
+	 * @return array<string, mixed>
+	 */
+	function wp_check_filetype_and_ext( $file, $filename, $mimes = null ) {
+		unset( $mimes );
+
+		$ext = strtolower( pathinfo( (string) $filename, PATHINFO_EXTENSION ) );
+		$map = array(
+			'jpg'  => 'image/jpeg',
+			'jpeg' => 'image/jpeg',
+			'png'  => 'image/png',
+			'gif'  => 'image/gif',
+			'webp' => 'image/webp',
+			'pdf'  => 'application/pdf',
+			'txt'  => 'text/plain',
+			'doc'  => 'application/msword',
+			'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+
+		if ( '' === $ext || ! isset( $map[ $ext ] ) ) {
+			return array(
+				'ext'             => false,
+				'type'            => false,
+				'proper_filename' => false,
+			);
+		}
+
+		$real = '';
+
+		if ( is_readable( $file ) && function_exists( 'finfo_file' ) ) {
+			$finfo = finfo_open( FILEINFO_MIME_TYPE );
+			$real  = $finfo ? (string) finfo_file( $finfo, $file ) : '';
+
+			if ( $finfo ) {
+				finfo_close( $finfo );
+			}
+		} elseif ( is_readable( $file ) && function_exists( 'mime_content_type' ) ) {
+			$real = (string) mime_content_type( $file );
+		}
+
+		$expected = $map[ $ext ];
+
+		if ( '' !== $real ) {
+			$real = strtolower( strtok( $real, ';' ) );
+
+			if ( 'txt' === $ext && ( 0 === strpos( $real, 'text/' ) || 'inode/x-empty' === $real || 'application/x-empty' === $real ) ) {
+				return array(
+					'ext'             => $ext,
+					'type'            => 'text/plain',
+					'proper_filename' => false,
+				);
+			}
+
+			$aliases = array(
+				'image/jpeg' => array( 'image/jpeg', 'image/jpg', 'image/pjpeg' ),
+			);
+			$ok      = ( $real === $expected ) || ( isset( $aliases[ $expected ] ) && in_array( $real, $aliases[ $expected ], true ) );
+
+			if ( ! $ok ) {
+				return array(
+					'ext'             => false,
+					'type'            => false,
+					'proper_filename' => false,
+				);
+			}
+		}
+
+		return array(
+			'ext'             => $ext,
+			'type'            => $expected,
+			'proper_filename' => false,
+		);
+	}
+}
+
+if ( ! function_exists( 'wp_next_scheduled' ) ) {
+	/**
+	 * @param string $hook Hook.
+	 * @return false
+	 */
+	function wp_next_scheduled( $hook ) {
+		unset( $hook );
+		return false;
+	}
+}
+
+if ( ! function_exists( 'wp_schedule_event' ) ) {
+	/**
+	 * @param int    $timestamp  Timestamp.
+	 * @param string $recurrence Recurrence.
+	 * @param string $hook       Hook.
+	 * @return bool
+	 */
+	function wp_schedule_event( $timestamp, $recurrence, $hook ) {
+		unset( $timestamp, $recurrence, $hook );
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_clear_scheduled_hook' ) ) {
+	/**
+	 * @param string $hook Hook.
+	 */
+	function wp_clear_scheduled_hook( $hook ) {
+		unset( $hook );
 	}
 }
 

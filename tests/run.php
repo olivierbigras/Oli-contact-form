@@ -13,6 +13,7 @@ $tests = array(
 	__DIR__ . '/test-anti-spam.php',
 	__DIR__ . '/test-front.php',
 	__DIR__ . '/MailSanitizeTest.php',
+	__DIR__ . '/UploadCleanupTest.php',
 );
 
 $failed = 0;
@@ -35,7 +36,7 @@ if ( function_exists( 'shell_exec' ) ) {
 }
 
 if ( '' !== $phpunit ) {
-	echo "=== phpunit MailSanitizeTest ===\n";
+	echo "=== phpunit ===\n";
 	passthru( escapeshellarg( $phpunit ) . ' -c ' . escapeshellarg( dirname( __DIR__ ) . '/phpunit.xml.dist' ), $code );
 	echo "\n";
 
