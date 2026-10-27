@@ -4,11 +4,11 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.9
+Stable tag: 0.3.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A simple, lightweight contact form plugin. Author: Olivier Bigras. Author URI: https://github.com/olivierbigras. Email: oli@olivierbigras.com
+A lightweight contact form with spam protection and file attachments that are sent by email and never stored.
 
 == Description ==
 
@@ -131,6 +131,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 == Changelog ==
 
+= 0.3.10 =
+* Readme: clearer short description.
+
 = 0.3.9 =
 * Uploaded files are staged only in a private temp directory outside the web root (0700 / 0600, random .bin name). There is no plugin tmp/ fallback.
 * If no private temp directory is available, a form with an attached file is refused (no copy, no email) and administrators see a dismissible notice.
@@ -206,6 +209,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.10 =
+Readme: clearer short description.
 
 = 0.3.9 =
 File uploads require a private temp directory outside the web root. Forms with attachments are refused if none is available.
