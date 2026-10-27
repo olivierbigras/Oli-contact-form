@@ -17,11 +17,14 @@ class Oli_CF_Anti_Spam {
 	/**
 	 * Check if submission passes anti-spam tests.
 	 *
-	 * @param array $data Posted data.
-	 * @return array|bool True if valid, array with error message if spam.
+	 * @param array<string, mixed> $data Posted data.
+	 * @return array<string, string>|true True if valid, array with error message if spam.
 	 */
 	public static function check( $data ) {
-		// Honeypot check.
+		if ( ! is_array( $data ) ) {
+			$data = array();
+		}
+
 		if ( ! empty( $data['oli_cf_hp'] ) ) {
 			return array(
 				'type'    => 'spam',
@@ -29,32 +32,24 @@ class Oli_CF_Anti_Spam {
 			);
 		}
 
-		// Time trap check (form must take at least 3 seconds to submit).
-		if ( ! empty( $data['oli_cf_timestamp'] ) ) {
-			$timestamp = intval( $data['oli_cf_timestamp'] );
-			$elapsed   = time() - $timestamp;
-
-			if ( $elapsed < 3 ) {
-				return array(
-					'type'    => 'spam',
-					'message' => __( 'Form submitted too quickly.', 'oli-contact-form' ),
-				);
-			}
-		}
-
-		// Check reCAPTCHA v3 if enabled.
 		$settings = get_option( 'oli_cf_settings', array() );
 
+		if ( ! is_array( $settings ) ) {
+			$settings = array();
+		}
+
 		if ( ! empty( $settings['recaptcha_enabled'] ) && ! empty( $settings['recaptcha_secret_key'] ) ) {
-			$recaptcha_result = self::verify_recaptcha( $data, $settings['recaptcha_secret_key'] );
+			$version          = self::normalize_recaptcha_version( isset( $settings['recaptcha_version'] ) ? $settings['recaptcha_version'] : 'v3' );
+			$recaptcha_result = self::verify_recaptcha( $data, $settings['recaptcha_secret_key'], $version );
+
 			if ( is_array( $recaptcha_result ) ) {
 				return $recaptcha_result;
 			}
 		}
 
-		// Check Cloudflare Turnstile if enabled.
 		if ( ! empty( $settings['turnstile_enabled'] ) && ! empty( $settings['turnstile_secret_key'] ) ) {
 			$turnstile_result = self::verify_turnstile( $data, $settings['turnstile_secret_key'] );
+
 			if ( is_array( $turnstile_result ) ) {
 				return $turnstile_result;
 			}
@@ -64,13 +59,14 @@ class Oli_CF_Anti_Spam {
 	}
 
 	/**
-	 * Verify Google reCAPTCHA v3 response.
+	 * Verify Google reCAPTCHA v2 or v3 response.
 	 *
-	 * @param array  $data       Posted data.
-	 * @param string $secret_key reCAPTCHA secret key.
-	 * @return array|bool True if valid, array with error if failed.
+	 * @param array<string, mixed> $data       Posted data.
+	 * @param string               $secret_key reCAPTCHA secret key.
+	 * @param string               $version    Configured version (v2 or v3).
+	 * @return array<string, string>|true True if valid, array with error if failed.
 	 */
-	private static function verify_recaptcha( $data, $secret_key ) {
+	private static function verify_recaptcha( $data, $secret_key, $version = 'v3' ) {
 		if ( empty( $data['g-recaptcha-response'] ) ) {
 			return array(
 				'type'    => 'validation_failed',
@@ -101,7 +97,7 @@ class Oli_CF_Anti_Spam {
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( empty( $body['success'] ) || $body['score'] < 0.5 ) {
+		if ( ! self::recaptcha_body_is_valid( $body, $version ) ) {
 			return array(
 				'type'    => 'spam',
 				'message' => __( 'Spam detected by reCAPTCHA.', 'oli-contact-form' ),
@@ -112,11 +108,95 @@ class Oli_CF_Anti_Spam {
 	}
 
 	/**
+	 * Whether a siteverify JSON body is an accepted reCAPTCHA result.
+	 *
+	 * v2 responses have `success` (and often `hostname`) but no `score`.
+	 * The score threshold applies only to v3.
+	 *
+	 * @param mixed  $body    Decoded siteverify body.
+	 * @param string $version Configured version (v2 or v3).
+	 * @return bool
+	 */
+	public static function recaptcha_body_is_valid( $body, $version = 'v3' ) {
+		if ( ! is_array( $body ) || empty( $body['success'] ) ) {
+			return false;
+		}
+
+		$version = self::normalize_recaptcha_version( $version );
+
+		if ( 'v3' === $version ) {
+			if ( ! isset( $body['score'] ) || (float) $body['score'] < 0.5 ) {
+				return false;
+			}
+		}
+
+		return self::recaptcha_hostname_is_valid( $body );
+	}
+
+	/**
+	 * Normalize a configured reCAPTCHA version. Never inferred from the key.
+	 *
+	 * @param mixed $version Version string or settings array.
+	 * @return string 'v2' or 'v3'.
+	 */
+	public static function normalize_recaptcha_version( $version ) {
+		if ( is_array( $version ) ) {
+			$version = isset( $version['recaptcha_version'] ) ? $version['recaptcha_version'] : 'v3';
+		}
+
+		return ( 'v2' === strtolower( (string) $version ) ) ? 'v2' : 'v3';
+	}
+
+	/**
+	 * Accept a siteverify hostname when one is present.
+	 *
+	 * Official Google test keys report `testkey.google.com`. When the site
+	 * host cannot be determined, a successful response is still accepted.
+	 *
+	 * @param array<string, mixed> $body Decoded siteverify body.
+	 * @return bool
+	 */
+	public static function recaptcha_hostname_is_valid( $body ) {
+		if ( empty( $body['hostname'] ) || ! is_string( $body['hostname'] ) ) {
+			return true;
+		}
+
+		$got = strtolower( $body['hostname'] );
+
+		if ( 'testkey.google.com' === $got ) {
+			return true;
+		}
+
+		$expected = self::expected_site_hostname();
+
+		if ( '' === $expected ) {
+			return true;
+		}
+
+		return $got === $expected;
+	}
+
+	/**
+	 * Site hostname used to compare a reCAPTCHA hostname claim.
+	 *
+	 * @return string
+	 */
+	private static function expected_site_hostname() {
+		if ( ! function_exists( 'home_url' ) || ! function_exists( 'wp_parse_url' ) ) {
+			return '';
+		}
+
+		$host = wp_parse_url( home_url(), PHP_URL_HOST );
+
+		return ( is_string( $host ) && '' !== $host ) ? strtolower( $host ) : '';
+	}
+
+	/**
 	 * Verify Cloudflare Turnstile response.
 	 *
-	 * @param array  $data       Posted data.
-	 * @param string $secret_key Turnstile secret key.
-	 * @return array|bool True if valid, array with error if failed.
+	 * @param array<string, mixed> $data       Posted data.
+	 * @param string               $secret_key Turnstile secret key.
+	 * @return array<string, string>|true True if valid, array with error if failed.
 	 */
 	private static function verify_turnstile( $data, $secret_key ) {
 		if ( empty( $data['cf-turnstile-response'] ) ) {
@@ -165,16 +245,12 @@ class Oli_CF_Anti_Spam {
 	 * @return string IP address.
 	 */
 	private static function get_client_ip() {
-		$ip = '';
-
-		if ( ! empty( $_SERVER['HTTP_CLIENT_IP'] ) ) {
-			$ip = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CLIENT_IP'] ) );
-		} elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$ip = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) );
-		} elseif ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
-			$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+		if ( empty( $_SERVER['REMOTE_ADDR'] ) ) {
+			return '';
 		}
 
-		return $ip;
+		$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+
+		return filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '';
 	}
 }

@@ -4,53 +4,52 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.2.1
+Stable tag: 0.3.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A simple, accessible contact form plugin with CF7-like tag syntax and built-in anti-spam protection.
+A lightweight contact form with spam protection and file attachments that are sent by email and never kept on your site.
 
 == Description ==
 
-Oli Contact Form is a deliberately simple alternative to Contact Form 7, designed to be lightweight and easy to use while maintaining all the essential features you need for contact forms.
+Oli Contact Form is a deliberately simple alternative to Contact Form 7. Create forms in the admin list, embed them with a shortcode or a block, and send the result by email. Nothing is stored in a submissions table.
+
+Author: Olivier Bigras
+Author URI: https://github.com/olivierbigras
+Plugin URI: https://github.com/olivierbigras/Oli-contact-form
+Email: oli@olivierbigras.com
 
 **Key Features:**
 
-* **CF7-like Tag Syntax** - Familiar tag-based form builder for easy form creation
-* **Tag Generator** - Visual buttons to insert field tags without memorizing syntax
-* **Multiple Field Types** - text, email, tel, url, number, date, textarea, select, checkbox, radio, acceptance, file upload
-* **File Uploads** - With configurable size and type restrictions, attached to emails
-* **Server-side & Client-side Validation** - Required fields and type validation
-* **AJAX Submission** - Smooth form submission with graceful no-JavaScript fallback
-* **Dual Email Support** - Main notification email + optional autoresponder
-* **Built-in Anti-spam** - Honeypot and time trap protection included by default
-* **Optional Anti-spam Services** - Google reCAPTCHA v3 and Cloudflare Turnstile support
-* **Gutenberg Block** - Easy form insertion with the block editor
-* **Shortcode Support** - `[oli_contact_form id="123"]` for classic editor
-* **Accessibility First** - Proper labels, ARIA attributes, and live regions
-* **Multilingual Ready** - Works with TranslatePress, WPML, and other translation plugins
-* **CF7 Importer** - Convert existing Contact Form 7 forms with one click
-* **CF7 Shortcode Compatibility** - Optional mapping so `[contact-form-7]` shortcodes work after migration
-* **Optional Message Copies** - Keep a copy of submissions in WordPress (off by default) with retention and privacy tools
-* **No Tracking** - Respects user privacy, no data sent to third parties unless you enable anti-spam services
-* **Themeable CSS** - Minimal styling that adapts to your theme
+* **Admin form list** - Create and edit forms under Oli Contact Forms
+* **Shortcode and block** - `[oli_contact_form id="123"]` or the Oli Contact Form block
+* **Field types** - text, email, phone (`tel` / `phone`), textarea, select, radio, checkbox, acceptance, file
+* **File uploads** - Extension and size limits. The file is attached to the notification email and deleted from the server immediately after sending
+* **Required fields and validation** - Server-side checks with editable messages
+* **Admin email + optional confirmation** - Mail 2 sends a copy to the sender. Use `[field-name]` tags in the subject and body
+* **Anti-spam** - Honeypot on every form, plus optional Cloudflare Turnstile or Google reCAPTCHA v2/v3 (scripts load only on pages that contain a form)
+* **AJAX submit** - With a non-JavaScript fallback
+* **Translatable** - Standard gettext strings with the `oli-contact-form` text domain, compatible with TranslatePress
+* **CF7 importer** - Converts existing Contact Form 7 form tags and mail settings
+* **No submission database** - Email only. No tracking
 
-Google reCAPTCHA v3 and Cloudflare Turnstile stay off until an administrator enables them and enters API keys. See **External services** below.
+Google reCAPTCHA (v2 or v3) and Cloudflare Turnstile stay off until an administrator enables them and enters API keys. See **External services** below.
 
 == External services ==
 
-This plugin does not call any third-party API by default. The built-in honeypot and time trap run entirely on your WordPress site. The following services are used only after an administrator enables them under Oli Contact Forms → Settings.
+This plugin does not call any third-party API by default. The built-in honeypot runs entirely on your WordPress site. The following services are used only after an administrator enables them under Oli Contact Forms → Settings.
 
 **Why remote scripts are required:** Google reCAPTCHA v3 and Cloudflare Turnstile are third-party anti-spam services. Their client scripts must be loaded from the provider CDN (`www.google.com` / `challenges.cloudflare.com`). Tokens are issued and signed by those services and can only be verified on their servers. The scripts cannot be copied into this plugin or self-hosted: a local copy would not mint valid tokens. They are therefore not “offloaded plugin assets”; they are the official service APIs. The plugin never loads them unless (1) an administrator has enabled the service and saved a site key, and (2) the current page actually contains a form (shortcode or block). Server-side `siteverify` calls run only on submit, and only when that service is enabled.
 
 Source code: [https://github.com/olivierbigras/Oli-contact-form](https://github.com/olivierbigras/Oli-contact-form)
 
-= Google reCAPTCHA v3 =
+= Google reCAPTCHA =
 
-When **Enable Google reCAPTCHA v3** is checked and a site key is saved, visitors who view a form load Google's official reCAPTCHA script so a token can be generated. On submit, WordPress verifies that token with Google. The script is not bundled because Google requires `https://www.google.com/recaptcha/api.js`.
+When **Enable Google reCAPTCHA** is checked, a version (v2 or v3) is selected, and a site key is saved, visitors who view a form load Google's official reCAPTCHA script. The version is a saved setting; it is never guessed from the key.
 
+* v2 loads `https://www.google.com/recaptcha/api.js` (no `render` parameter) and shows the “I'm not a robot” checkbox. The widget token is posted as `g-recaptcha-response`.
+* v3 loads `https://www.google.com/recaptcha/api.js?render=SITEKEY` and calls `grecaptcha.execute` on submit. Siteverify must return a score of at least 0.5.
 * When it runs: only if reCAPTCHA is enabled **and** the page has a form (shortcode or block). Verification runs on each submission.
-* Client script (official CDN, cannot be self-hosted): `https://www.google.com/recaptcha/api.js` (with your site key as the `render` parameter).
 * Server endpoint: `https://www.google.com/recaptcha/api/siteverify` via `wp_remote_post` (only on submit, only if enabled).
 * Data sent: the visitor's reCAPTCHA response token, your reCAPTCHA secret key, and the visitor's IP address (`remoteip`). Google may also collect device and interaction data as described in their privacy policy.
 * Service: [https://www.google.com/recaptcha/](https://www.google.com/recaptcha/)
@@ -73,18 +72,11 @@ Secret keys are stored in the WordPress options table and are never printed in s
 
 == Privacy ==
 
-By default this plugin does **not** store form submissions. Messages are sent with WordPress `wp_mail()` only.
+This plugin does **not** store form submissions. Messages are sent with WordPress `wp_mail()` only. File uploads are attached to the notification email and deleted from the server right after sending.
 
-If an administrator enables **Keep a copy of messages** under Oli Contact Forms → Settings:
+Optional anti-spam services (Google reCAPTCHA or Cloudflare Turnstile) may process visitor data according to those providers’ policies when they are enabled.
 
-* Submitted fields (name, email, message text, and other form fields) are saved in the `{prefix}oli_cf_messages` table.
-* Copies are listed under Oli Contact Forms → Messages (date, form, sender, preview, and a detail view).
-* An administrator with `manage_options` can delete one message or several at once.
-* A daily WP-Cron job deletes copies older than the configured retention (default 30 days; `0` means keep until deleted manually).
-* Tools → Export Personal Data and Tools → Erase Personal Data can export or delete stored copies by email address.
-* Suggested privacy-policy text is added under Settings → Privacy.
-
-File uploads are attached to the notification email and are not stored. Uninstalling the plugin drops the messages table, deletes settings, clears the purge cron, and removes contact form posts.
+Uninstalling the plugin deletes settings and contact form posts.
 
 == Installation ==
 
@@ -101,35 +93,31 @@ Go to 'Oli Contact Forms' > 'Add New' in your WordPress admin. Use the tag gener
 
 = What field types are supported? =
 
-Text, email, tel, url, number, date, textarea, select, checkbox, radio, acceptance, file upload, and submit button.
+Text, email, phone (`[tel]` or `[phone]`), textarea, select, checkbox, radio, acceptance, and file upload. Submit buttons are supported. Extra input types (`url`, `number`, `date`) also work.
 
 = Can I import my Contact Form 7 forms? =
 
-Yes! Go to 'Oli Contact Forms' > 'Import from CF7' to convert your existing CF7 forms.
+Yes. Go to 'Oli Contact Forms' > 'Import from CF7' to convert your existing CF7 form tags and mail settings.
 
 = Does it work without JavaScript? =
 
-Yes. While the plugin uses AJAX for a better user experience, it has a graceful fallback for users without JavaScript.
-
-= Is it compatible with page builders? =
-
-Yes. Use the shortcode `[oli_contact_form id="123"]` in any page builder that supports WordPress shortcodes.
+Yes. AJAX is used when JavaScript is available. Without it, the form posts normally and redirects back with a status message.
 
 = How do I enable anti-spam protection? =
 
-The plugin includes honeypot and time trap protection by default. For additional protection, go to 'Oli Contact Forms' > 'Settings' to enable Google reCAPTCHA v3 or Cloudflare Turnstile.
+Every form includes a honeypot field. For additional protection, go to 'Oli Contact Forms' > 'Settings' to enable Google reCAPTCHA (v2 or v3) or Cloudflare Turnstile.
 
 = Where are form submissions stored? =
 
-By default they are not stored. Submissions are sent by email. If you enable **Keep a copy of messages**, successful submissions are saved in the `oli_cf_messages` table and appear under Messages. Set a retention period (default 30 days) or use 0 to keep them until you delete them.
+They are not stored. Submissions are sent by email only. Uploaded files are attached to that email and then deleted.
 
-= How do I export or erase a visitor's stored message? =
+= Can I customize the validation messages? =
 
-Use the WordPress privacy tools (Tools → Export Personal Data / Erase Personal Data) with the visitor's email address. Suggested policy wording is available under Settings → Privacy.
+Yes. Each form has a Messages box for the success text, mail error, form-level validation error, and field-level messages.
 
-= Can I customize the styling? =
+= Is it compatible with TranslatePress? =
 
-Yes. The plugin includes minimal CSS that you can override in your theme. All form elements have CSS classes prefixed with `oli-cf-`.
+Yes. User-facing strings use the `oli-contact-form` text domain and standard WordPress translation functions.
 
 == Screenshots ==
 
@@ -138,8 +126,77 @@ Yes. The plugin includes minimal CSS that you can override in your theme. All fo
 3. Form displayed on the frontend
 4. Gutenberg block settings
 5. CF7 importer
+6. Success message after a submission
+7. Validation errors: required field and invalid email address
 
 == Changelog ==
+
+= 0.3.12 =
+* Readme: short description now says attachments are "never kept on your site".
+* Security: the CF7 import result notice and the staging notice dismissal verify a nonce before reading the request.
+* Security: mail settings are read through filter_input() and sanitized field by field, without bypassing the input checks.
+* Late escaping: the form markup and the reCAPTCHA widget are escaped with wp_kses() and an explicit allow-list at output.
+* Uninstall uses the %i identifier placeholder for the options table.
+* Fix: the honeypot and the reCAPTCHA/Turnstile tokens were removed from the data before the anti-spam check (since 0.3.3), so a filled honeypot was not rejected and an enabled captcha with a secret key rejected every submission. They are now checked again.
+* The no-JavaScript fallback now runs on wp_loaded instead of init, so a rejected request no longer triggers WooCommerce "called too early" notices.
+
+= 0.3.10 =
+* Readme: clearer short description.
+
+= 0.3.9 =
+* Uploaded files are staged only in a private temp directory outside the web root (0700 / 0600, random .bin name). There is no plugin tmp/ fallback.
+* If no private temp directory is available, a form with an attached file is refused (no copy, no email) and administrators see a dismissible notice.
+* Updating removes leftover files from the old plugin tmp/ directory.
+
+= 0.3.8 =
+* Uploaded files are staged in a private random directory, attached, then deleted in a try/finally (plus shutdown and hourly leftover cleanup). A file is never kept on the server.
+* Staging requires is_uploaded_file(). Real type is checked with wp_check_filetype_and_ext in addition to the allowed extension.
+* Uninstall deletes oli_cf_fb_* feedback transients (and their timeouts), including on multisite.
+
+= 0.3.7 =
+* Saving mail settings keeps angle brackets around field tags and email addresses (From: [your-name] <[your-email]>). Real HTML tags are stripped. Single-line headers still drop CR/LF.
+
+= 0.3.6 =
+* Translation fixes: block editor script translations, translatable default emails, regenerated POT.
+
+= 0.3.5 =
+* Merge stored _oli_cf_mail / _oli_cf_mail_2 with defaults (wp_parse_args) so a migrated meta without reply_to does not warn on the form editor. The mailer does the same before send.
+
+= 0.3.4 =
+* No-JS status return now hashes #oli-cf-response-{id} (the banner has that id, tabindex="-1"). Without a status the hash stays #oli-cf-form-{id}.
+* No-JS error summary links prefix the field label (Label : message), like the JS summary.
+* Field border #8c8f94 uses a more specific selector so Storefront and Twenty Twenty-Five do not override it.
+
+= 0.3.3 =
+* AJAX success and error banners show again: handleAjaxResponse now binds `this` instead of window.self.
+* The submit button and spinner reset after success, validation errors, and network failures.
+* No-JS validation is distinguished from a send failure (oli_cf_status=validation|mail_failed). Field values and errors come back via a 5-minute token transient, not the URL.
+* JS error summary names the field and uses singular/plural copy.
+* Status banner (.oli-cf-response-output) is focusable (tabindex="-1") after a no-JS return.
+* Imported CF7 [acceptance] is required by default (with or without *); optional only when the CF7 optional option is present.
+
+= 0.3.2 =
+* reCAPTCHA version is a setting (v2 checkbox or v3 execute). Do not guess the version from the key.
+* v3 siteverify responses without a score are rejected. v2 still accepts success:true.
+* CF7 [file] tags keep limit and filetypes. Paired [acceptance]…[/acceptance] becomes the checkbox label.
+* AJAX submits are no longer intercepted by the non-AJAX handler (JSON success instead of a 302).
+* Non-JS submits return to the same page (#oli-cf-form-{id}) via a validated hidden permalink.
+* Per-field error messages, required asterisks, stronger focus and contrast styles.
+* Do not register [contact-form-7] while Contact Form 7 is active.
+
+= 0.3.1 =
+* Accept reCAPTCHA v2 when siteverify returns success (score threshold is v3 only).
+* Resolve Contact Form 7 special mail-tags such as [_site_admin_email] on send. Fall back to the site admin email when To is empty or invalid.
+* Enforce maxlength and minlength on the server (mb_strlen) and render those attributes in the form HTML.
+
+= 0.3.0 =
+* Remove submission database storage. Email only.
+* Remove load_plugin_textdomain(); translations load from WordPress.org language packs.
+* Editable field-level validation messages.
+* File uploads are staged, attached, and deleted immediately after send.
+* CF7 importer converts form tags and mail settings, including Reply-To.
+* Tests for validation, mail build, upload deletion, and CF7 import.
+* Author URI https://github.com/olivierbigras (Plugin URI remains the repository URL).
 
 = 0.2.1 =
 * Add ABSPATH direct-access guards to every plugin PHP file.
@@ -149,45 +206,57 @@ Yes. The plugin includes minimal CSS that you can override in your theme. All fo
 * Exclude development files from the distribution ZIP.
 
 = 0.2.0 =
-* Optional “Keep a copy of messages” setting (off by default).
-* Stored copies use the `{prefix}oli_cf_messages` table and a Messages admin list (date, form, sender, preview, detail).
-* Single and bulk delete, daily retention purge (default 30 days, 0 = unlimited).
-* WordPress privacy exporters, erasers, and suggested privacy-policy text.
-* Uninstall removes stored messages, settings, the cron event, and form posts.
+* Optional stored message copies (removed in 0.3.0).
 
 = 0.1.1 =
-* Document Google reCAPTCHA v3 and Cloudflare Turnstile under External services (what, when, data sent, terms and privacy).
-* Move the CF7 importer "select all" script into an enqueued file (no inline JavaScript).
-* Move the honeypot off-screen style into `oli-cf-public.css`.
-* Prefix captcha script handles (`oli-cf-recaptcha`, `oli-cf-turnstile`) and load public/captcha assets only on pages with a form.
+* Document Google reCAPTCHA v3 and Cloudflare Turnstile under External services.
+* Move the CF7 importer script into an enqueued file.
+* Load front-end scripts only on form pages.
 * Verify the non-AJAX success/error query args with a nonce.
-* Pin GitHub Actions PHPCS to php_codesniffer 3.x.
 
 = 0.1.0 =
 * Initial release
-* CF7-like tag syntax with visual tag generator
-* All essential field types (text, email, tel, url, number, date, textarea, select, checkbox, radio, acceptance, file)
-* Server-side and client-side validation
-* AJAX submission with graceful fallback
-* Main email + optional autoresponder (Mail 2)
-* Built-in honeypot and time trap anti-spam
-* Optional Google reCAPTCHA v3 support
-* Optional Cloudflare Turnstile support
-* Gutenberg block and shortcode
-* Contact Form 7 importer
-* Optional CF7 shortcode compatibility mode
-* Accessible and multilingual ready
 
 == Upgrade Notice ==
 
+= 0.3.12 =
+Fixes the honeypot and captcha checks, plus security hardening (nonce checks on admin notices, late escaping of form output). No settings change.
+
+= 0.3.10 =
+Readme: clearer short description.
+
+= 0.3.9 =
+File uploads require a private temp directory outside the web root. Forms with attachments are refused if none is available.
+
+= 0.3.8 =
+Uploaded files are attached then deleted even if mail hooks throw. Spoofed file types are rejected.
+
+= 0.3.7 =
+Saving a form no longer strips <[your-email]> from the default notification body.
+
+= 0.3.6 =
+Translation fixes: block editor script translations, translatable default emails, regenerated POT.
+
+= 0.3.5 =
+Form editor no longer warns when notification mail meta is missing reply_to (programmatic or migrated forms).
+
+= 0.3.4 =
+No-JS status returns land on the message banner. Field borders keep #8c8f94 under common themes.
+
+= 0.3.3 =
+Fixes the AJAX banner crash (self is undefined). Imported CF7 acceptance fields are required unless they use the optional option.
+
+= 0.3.2 =
+Choose reCAPTCHA v2 or v3 in Settings. AJAX success is shown correctly. Imported CF7 file and acceptance fields keep their options and labels.
+
+= 0.3.1 =
+Fixes reCAPTCHA v2 rejection, empty imported CF7 recipients, and missing maxlength/minlength checks.
+
+= 0.3.0 =
+Submissions are email-only. The optional Messages database from 0.2.x is removed. File uploads are still attached to email and then deleted.
+
 = 0.2.1 =
 New forms use the site admin email as From (visitor email in Reply-To) and include an optional consent checkbox. Existing forms are unchanged.
-
-= 0.2.0 =
-Optional stored message copies (off by default), retention purge, and WordPress privacy tools.
-
-= 0.1.1 =
-Documents optional Google/Turnstile calls, removes inline JS/CSS, and loads front-end scripts only on form pages.
 
 = 0.1.0 =
 Initial release of Oli Contact Form.

@@ -25,24 +25,25 @@ class Oli_CF_Block {
 		wp_register_script(
 			'oli-cf-block-editor',
 			OLI_CF_PLUGIN_URL . 'assets/js/oli-cf-block.js',
-			array( 'wp-blocks', 'wp-element', 'wp-editor', 'wp-components', 'wp-i18n' ),
+			array( 'wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-i18n', 'wp-server-side-render' ),
 			OLI_CF_VERSION,
 			true
 		);
 
-		$forms = $this->get_forms_list();
+		wp_set_script_translations( 'oli-cf-block-editor', 'oli-contact-form', OLI_CF_PLUGIN_DIR . 'languages' );
 
 		wp_localize_script(
 			'oli-cf-block-editor',
 			'oliCfBlock',
 			array(
-				'forms' => $forms,
+				'forms' => $this->get_forms_list(),
 			)
 		);
 
 		register_block_type(
 			'oli-cf/contact-form',
 			array(
+				'api_version'     => 3,
 				'editor_script'   => 'oli-cf-block-editor',
 				'render_callback' => array( $this, 'render_block' ),
 				'attributes'      => array(
@@ -58,7 +59,7 @@ class Oli_CF_Block {
 	/**
 	 * Render block.
 	 *
-	 * @param array $attributes Block attributes.
+	 * @param array<string, mixed> $attributes Block attributes.
 	 * @return string Block HTML.
 	 */
 	public function render_block( $attributes ) {
@@ -75,7 +76,7 @@ class Oli_CF_Block {
 	/**
 	 * Get list of forms for block editor.
 	 *
-	 * @return array Forms list.
+	 * @return array<int, array<string, mixed>>
 	 */
 	private function get_forms_list() {
 		$forms = get_posts(
