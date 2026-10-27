@@ -229,6 +229,28 @@ class Oli_CF_Public {
 	}
 
 	/**
+	 * Tags and attributes produced by recaptcha_widget_html(), for late escaping.
+	 *
+	 * @since 0.3.12
+	 *
+	 * @return array<string, array<string, bool>>
+	 */
+	public static function recaptcha_allowed_html() {
+		return array(
+			'div'   => array(
+				'class'        => true,
+				'data-sitekey' => true,
+			),
+			'input' => array(
+				'type'  => true,
+				'name'  => true,
+				'id'    => true,
+				'value' => true,
+			),
+		);
+	}
+
+	/**
 	 * Whether the official Turnstile client script should load on this request.
 	 *
 	 * @param array<string, mixed> $settings Plugin settings.

@@ -197,6 +197,31 @@ oli_cf_assert_true( false !== strpos( $submission_src, 'redirect_fragment' ), 'r
 $submit_html = Oli_CF_Form_Parser::parse( '[submit "Send"]', 8 );
 oli_cf_assert_same( false, strpos( $submit_html, 'disabled' ), 'submit button is not disabled without JS' );
 
+// 0.3.12: late escaping of the reCAPTCHA markup keeps every tag and attribute it produces.
+$oli_cf_allowed = Oli_CF_Public::recaptcha_allowed_html();
+foreach ( array( $v2_html, $v3_html ) as $oli_cf_html ) {
+	preg_match_all( '/<([a-z]+)([^>]*)>/', $oli_cf_html, $oli_cf_tags, PREG_SET_ORDER );
+	foreach ( $oli_cf_tags as $oli_cf_tag ) {
+		oli_cf_assert_true( isset( $oli_cf_allowed[ $oli_cf_tag[1] ] ), 'recaptcha tag allowed: ' . $oli_cf_tag[1] );
+		preg_match_all( '/([a-z-]+)=/', $oli_cf_tag[2], $oli_cf_attrs );
+		foreach ( $oli_cf_attrs[1] as $oli_cf_attr ) {
+			oli_cf_assert_true( ! empty( $oli_cf_allowed[ $oli_cf_tag[1] ][ $oli_cf_attr ] ), 'recaptcha attribute allowed: ' . $oli_cf_tag[1] . ' ' . $oli_cf_attr );
+		}
+	}
+}
+
+// 0.3.12: no phpcs:ignore left on nonce, escaping or superglobal reads in shipped code.
+foreach ( array( 'admin', 'includes', 'public' ) as $oli_cf_dir ) {
+	foreach ( glob( dirname( __DIR__ ) . '/' . $oli_cf_dir . '/*.php' ) as $oli_cf_file ) {
+		$oli_cf_src = file_get_contents( $oli_cf_file );
+		oli_cf_assert_same( 0, preg_match( '/phpcs:(ignore|disable)[^\n]*(NonceVerification|EscapeOutput|ValidatedSanitizedInput)/', $oli_cf_src ), 'no security ignore in ' . basename( $oli_cf_file ) );
+	}
+}
+
+// 0.3.12: the import result notice requires its own nonce.
+$oli_cf_importer = file_get_contents( dirname( __DIR__ ) . '/admin/class-oli-cf-importer.php' );
+oli_cf_assert_same( 2, substr_count( $oli_cf_importer, "'oli_cf_imported_nonce' => wp_create_nonce( 'oli_cf_imported' )" ), 'both import redirects carry the notice nonce' );
+
 if ( $oli_cf_failures > 0 ) {
 	fwrite( STDERR, "\n{$oli_cf_failures} front test(s) failed.\n" );
 	exit( 1 );

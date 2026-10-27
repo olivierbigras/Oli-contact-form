@@ -161,11 +161,10 @@ class Oli_CF_Admin {
 			return;
 		}
 
-		if ( ! isset( $_GET['oli_cf_dismiss_staging'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- verified below.
+		if ( ! isset( $_GET['oli_cf_dismiss_staging'], $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_GET['_wpnonce'] ) ), 'oli_cf_dismiss_staging' ) ) {
 			return;
 		}
 
-		check_admin_referer( 'oli_cf_dismiss_staging' );
 		Oli_CF_Uploads::clear_unavailable_notice();
 
 		if ( function_exists( 'wp_get_referer' ) && function_exists( 'wp_safe_redirect' ) && function_exists( 'remove_query_arg' ) ) {
@@ -188,11 +187,11 @@ class Oli_CF_Admin {
 			return;
 		}
 
-		if ( ! isset( $_GET['oli_cf_imported'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only status flag.
+		if ( ! isset( $_GET['oli_cf_imported'], $_GET['oli_cf_imported_nonce'] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_GET['oli_cf_imported_nonce'] ) ), 'oli_cf_imported' ) ) {
 			return;
 		}
 
-		$count = absint( wp_unslash( $_GET['oli_cf_imported'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$count = absint( wp_unslash( $_GET['oli_cf_imported'] ) );
 
 		echo '<div class="notice notice-success is-dismissible"><p>';
 		echo esc_html(

@@ -271,15 +271,15 @@ class Oli_CF_Meta_Boxes {
 			update_post_meta( $post_id, '_oli_cf_form_template', wp_kses_post( wp_unslash( $_POST['oli_cf_form_template'] ) ) );
 		}
 
-		if ( isset( $_POST['oli_cf_mail'] ) && is_array( $_POST['oli_cf_mail'] ) ) {
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Oli_CF_Mailer::sanitize_mail_settings() strips HTML and keeps <[tag]>/emails.
-			$mail = Oli_CF_Mailer::sanitize_mail_settings( wp_unslash( $_POST['oli_cf_mail'] ) );
+		// Mail settings keep <[tag]> placeholders that core text sanitizers would strip, so the
+		// unslashed request array goes straight to the dedicated field-by-field sanitizer.
+		$mail = self::read_posted_mail_settings( 'oli_cf_mail', false );
+		if ( null !== $mail ) {
 			update_post_meta( $post_id, '_oli_cf_mail', $mail );
 		}
 
-		if ( isset( $_POST['oli_cf_mail_2'] ) && is_array( $_POST['oli_cf_mail_2'] ) ) {
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Oli_CF_Mailer::sanitize_mail_settings() strips HTML and keeps <[tag]>/emails.
-			$mail_2 = Oli_CF_Mailer::sanitize_mail_settings( wp_unslash( $_POST['oli_cf_mail_2'] ), true );
+		$mail_2 = self::read_posted_mail_settings( 'oli_cf_mail_2', true );
+		if ( null !== $mail_2 ) {
 			update_post_meta( $post_id, '_oli_cf_mail_2', $mail_2 );
 		}
 
@@ -323,5 +323,28 @@ class Oli_CF_Meta_Boxes {
 	 */
 	private function get_default_mail_2() {
 		return Oli_CF_Mailer::default_mail_2();
+	}
+
+	/**
+	 * Read and sanitize one posted mail settings array.
+	 *
+	 * Only called from save_form_data() after the nonce and edit_post checks. filter_input()
+	 * returns the original request values (no WordPress slashes); every field is then
+	 * cleaned by Oli_CF_Mailer::sanitize_mail_settings() before use.
+	 *
+	 * @since 0.3.12
+	 *
+	 * @param string $key       Request key.
+	 * @param bool   $is_mail_2 Whether this is the Mail (2) block.
+	 * @return array<string, mixed>|null Sanitized settings, or null when not posted.
+	 */
+	private static function read_posted_mail_settings( $key, $is_mail_2 ) {
+		$posted = filter_input( INPUT_POST, $key, FILTER_UNSAFE_RAW, FILTER_REQUIRE_ARRAY );
+
+		if ( ! is_array( $posted ) ) {
+			return null;
+		}
+
+		return Oli_CF_Mailer::sanitize_mail_settings( $posted, $is_mail_2 );
 	}
 }

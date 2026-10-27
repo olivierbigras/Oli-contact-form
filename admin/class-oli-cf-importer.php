@@ -116,7 +116,15 @@ class Oli_CF_Importer {
 		$form_ids = isset( $_POST['import_forms'] ) ? array_map( 'absint', wp_unslash( $_POST['import_forms'] ) ) : array();
 
 		if ( empty( $form_ids ) ) {
-			wp_safe_redirect( add_query_arg( 'oli_cf_imported', 0, admin_url( 'edit.php?post_type=oli_contact_form&page=oli-cf-import-cf7' ) ) );
+			wp_safe_redirect(
+				add_query_arg(
+					array(
+						'oli_cf_imported'       => 0,
+						'oli_cf_imported_nonce' => wp_create_nonce( 'oli_cf_imported' ),
+					),
+					admin_url( 'edit.php?post_type=oli_contact_form&page=oli-cf-import-cf7' )
+				)
+			);
 			exit;
 		}
 
@@ -128,7 +136,15 @@ class Oli_CF_Importer {
 			}
 		}
 
-		wp_safe_redirect( add_query_arg( 'oli_cf_imported', $imported_count, admin_url( 'edit.php?post_type=oli_contact_form' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'oli_cf_imported'       => $imported_count,
+					'oli_cf_imported_nonce' => wp_create_nonce( 'oli_cf_imported' ),
+				),
+				admin_url( 'edit.php?post_type=oli_contact_form' )
+			)
+		);
 		exit;
 	}
 

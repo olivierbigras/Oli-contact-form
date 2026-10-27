@@ -242,9 +242,9 @@ class Oli_CF_Shortcode {
 					<input type="text" name="oli_cf_hp" id="oli-cf-hp-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" value="" tabindex="-1" autocomplete="off" />
 				</div>
 
-				<?php echo Oli_CF_Form_Parser::parse( $template, $form_id, $field_state ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- parse() runs wp_kses(). ?>
+				<?php echo wp_kses( Oli_CF_Form_Parser::parse( $template, $form_id, $field_state ), Oli_CF_Form_Parser::allowed_html() ); ?>
 
-				<?php echo Oli_CF_Public::recaptcha_widget_html( $form_id, $settings ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes attributes. ?>
+				<?php echo wp_kses( Oli_CF_Public::recaptcha_widget_html( $form_id, $settings ), Oli_CF_Public::recaptcha_allowed_html() ); ?>
 
 				<?php if ( ! empty( $settings['turnstile_enabled'] ) && ! empty( $settings['turnstile_site_key'] ) ) : ?>
 					<div class="cf-turnstile" data-sitekey="<?php echo esc_attr( $settings['turnstile_site_key'] ); ?>" data-callback="oliCfTurnstileCallback"></div>

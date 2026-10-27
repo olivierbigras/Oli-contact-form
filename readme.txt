@@ -4,11 +4,11 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.10
+Stable tag: 0.3.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A lightweight contact form with spam protection and file attachments that are sent by email and never stored.
+A lightweight contact form with spam protection and file attachments that are sent by email and never kept on your site.
 
 == Description ==
 
@@ -131,6 +131,13 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 == Changelog ==
 
+= 0.3.12 =
+* Readme: short description now says attachments are "never kept on your site".
+* Security: the CF7 import result notice and the staging notice dismissal verify a nonce before reading the request.
+* Security: mail settings are read through filter_input() and sanitized field by field, without bypassing the input checks.
+* Late escaping: the form markup and the reCAPTCHA widget are escaped with wp_kses() and an explicit allow-list at output.
+* Uninstall uses the %i identifier placeholder for the options table.
+
 = 0.3.10 =
 * Readme: clearer short description.
 
@@ -209,6 +216,9 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.3.12 =
+Security hardening (nonce checks on admin notices, late escaping of form output). No settings change.
 
 = 0.3.10 =
 Readme: clearer short description.

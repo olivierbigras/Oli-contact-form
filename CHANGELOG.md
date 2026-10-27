@@ -5,6 +5,21 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.12] - 2026-10-27
+
+### Modifié
+- Readme : la description courte indique que les pièces jointes ne sont « jamais conservées sur votre site » (« never kept on your site »).
+
+### Sécurité
+- La notice de résultat d'import CF7 exige un nonce dédié (`oli_cf_imported_nonce`), ajouté aux deux redirections de l'importeur.
+- Le masquage de la notice de staging vérifie le nonce avec `wp_verify_nonce()` avant toute lecture de la requête.
+- Les réglages de courriel sont lus via `filter_input()` puis nettoyés champ par champ par `Oli_CF_Mailer::sanitize_mail_settings()` (les balises `<[champ]>` sont conservées), sans `phpcs:ignore`.
+- Échappement tardif : le gabarit du formulaire et le widget reCAPTCHA passent par `wp_kses()` avec une liste blanche explicite à l'affichage.
+- Désinstallation : requête sur la table des options avec `%i`.
+
+### Notes
+- Version 0.3.11 sautée (réservée à une version de travail non publiée).
+
 ## [0.3.10] - 2026-10-27
 
 ### Changed

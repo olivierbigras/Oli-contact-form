@@ -59,7 +59,8 @@ function oli_cf_delete_feedback_transients() {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- uninstall must drop leftover feedback transients that hold posted values.
 	$wpdb->query(
 		$wpdb->prepare(
-			"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+			'DELETE FROM %i WHERE option_name LIKE %s OR option_name LIKE %s',
+			$wpdb->options,
 			$transient_like,
 			$timeout_like
 		)
