@@ -308,10 +308,10 @@ class Oli_CF_Submission {
 			);
 		}
 
-		$template = get_post_meta( $form_id, '_oli_cf_form_template', true );
+		$fields   = Oli_CF_Fields::for_form( $form_id );
 		$messages = Oli_CF_Validator::normalize_messages( get_post_meta( $form_id, '_oli_cf_messages', true ) );
 
-		if ( empty( $template ) ) {
+		if ( empty( $fields ) ) {
 			return array(
 				'success' => false,
 				'status'  => 'mail_failed',
@@ -319,8 +319,7 @@ class Oli_CF_Submission {
 			);
 		}
 
-		$data   = $this->sanitize_posted_data( $post );
-		$fields = Oli_CF_Form_Parser::parse_fields( $template );
+		$data = $this->sanitize_posted_data( $post, $fields );
 
 		/**
 		 * Fires before validation.
@@ -351,7 +350,7 @@ class Oli_CF_Submission {
 			);
 		}
 
-		$validation = Oli_CF_Validator::validate( $data, $template, $files, $messages );
+		$validation = Oli_CF_Validator::validate( $data, $fields, $files, $messages );
 
 		if ( is_array( $validation ) ) {
 			return array(
@@ -413,7 +412,7 @@ class Oli_CF_Submission {
 			return array(
 				'success' => false,
 				'status'  => 'mail_failed',
-				'message' => $messages['mail_sent_ng'],
+				'message' => $messages['send_error'],
 				'values'  => $data,
 			);
 		}
@@ -429,21 +428,36 @@ class Oli_CF_Submission {
 		return array(
 			'success' => true,
 			'status'  => 'success',
-			'message' => $messages['mail_sent_ok'],
+			'message' => $messages['success'],
 		);
 	}
 
 	/**
 	 * Sanitize posted fields used in mail and validation.
 	 *
-	 * @param array<string, mixed> $post Posted data.
+	 * A textarea keeps its line breaks. Other fields use the single-line sanitizer.
+	 *
+	 * @param array<string, mixed>             $post   Posted data.
+	 * @param array<int, array<string, mixed>> $fields Form fields.
 	 * @return array<string, mixed>
 	 */
-	private function sanitize_posted_data( $post ) {
+	private function sanitize_posted_data( $post, $fields = array() ) {
 		$clean = array();
 
 		if ( ! is_array( $post ) ) {
 			return $clean;
+		}
+
+		$types = array();
+
+		if ( is_array( $fields ) ) {
+			foreach ( $fields as $field ) {
+				if ( ! is_array( $field ) || empty( $field['name'] ) ) {
+					continue;
+				}
+
+				$types[ (string) $field['name'] ] = isset( $field['type'] ) ? (string) $field['type'] : '';
+			}
 		}
 
 		$skip = array(
@@ -468,14 +482,16 @@ class Oli_CF_Submission {
 				continue;
 			}
 
+			$textarea = isset( $types[ $key ] ) && 'textarea' === $types[ $key ];
+
 			if ( is_array( $value ) ) {
-				$clean[ $key ] = array_map( 'sanitize_text_field', $value );
+				$clean[ $key ] = array_map( $textarea ? 'sanitize_textarea_field' : 'sanitize_text_field', $value );
 				continue;
 			}
 
 			$value = (string) $value;
 
-			if ( strlen( $value ) > 200 ) {
+			if ( $textarea ) {
 				$clean[ $key ] = sanitize_textarea_field( $value );
 			} else {
 				$clean[ $key ] = sanitize_text_field( $value );

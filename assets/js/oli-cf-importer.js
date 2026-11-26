@@ -1,11 +1,11 @@
 /**
- * CF7 importer admin script for Oli Contact Form.
+ * Form importer admin script for Oli Contact Form.
  */
 (function () {
 	'use strict';
 
 	document.addEventListener('DOMContentLoaded', function () {
-		var selectAll = document.getElementById('oli-cf-select-all');
+		var selectAll = document.getElementById('oli-cf-import-all');
 
 		if (!selectAll) {
 			return;

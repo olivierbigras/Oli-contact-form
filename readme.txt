@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.12
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,9 @@ A lightweight contact form with spam protection and file attachments that are se
 
 == Description ==
 
-Oli Contact Form is a deliberately simple alternative to Contact Form 7. Create forms in the admin list, embed them with a shortcode or a block, and send the result by email. Nothing is stored in a submissions table.
+Oli Contact Form is a simple, accessible form builder. Create forms in the admin list, embed them with a shortcode or a block, and send the result by email. Nothing is stored in a submissions table.
+
+Sites that already embed a form with the shortcode `[contact-form-7]` can keep that shortcode. The name stays in the setting, the public renderer, the translation catalog, this readme, and the tests on purpose, so those embeds keep working. It is not this plugin's field syntax. Forms are a field list, with an optional text form such as `{{field type="email" name="email" required}}`.
 
 Author: Olivier Bigras
 Author URI: https://github.com/olivierbigras
@@ -26,11 +28,11 @@ Email: oli@olivierbigras.com
 * **Field types** - text, email, phone (`tel` / `phone`), textarea, select, radio, checkbox, acceptance, file
 * **File uploads** - Extension and size limits. The file is attached to the notification email and deleted from the server immediately after sending
 * **Required fields and validation** - Server-side checks with editable messages
-* **Admin email + optional confirmation** - Mail 2 sends a copy to the sender. Use `[field-name]` tags in the subject and body
+* **Notifications** - An extensible list: an admin email, an optional confirmation to the sender, and any further messages. Use tokens such as `{field:email}`, `{site:title}`, and `{submission:date}`
 * **Anti-spam** - Honeypot on every form, plus optional Cloudflare Turnstile or Google reCAPTCHA v2/v3 (scripts load only on pages that contain a form)
 * **AJAX submit** - With a non-JavaScript fallback
 * **Translatable** - Standard gettext strings with the `oli-contact-form` text domain, compatible with TranslatePress
-* **CF7 importer** - Converts existing Contact Form 7 form tags and mail settings
+* **Import** - Reads existing forms from several plugins and saves them as drafts in the field builder
 * **No submission database** - Email only. No tracking
 
 Google reCAPTCHA (v2 or v3) and Cloudflare Turnstile stay off until an administrator enables them and enters API keys. See **External services** below.
@@ -89,15 +91,15 @@ Uninstalling the plugin deletes settings and contact form posts.
 
 = How do I create a form? =
 
-Go to 'Oli Contact Forms' > 'Add New' in your WordPress admin. Use the tag generator buttons to add fields, or write tags directly using CF7-like syntax (e.g., `[text* your-name]` for a required text field).
+Go to 'Oli Contact Forms' > 'Add New' in your WordPress admin. Add each field in the field list (type, name, label, required, choices). An optional text form uses attributes, for example `{{field type="email" name="email" label="Email" required}}`.
 
 = What field types are supported? =
 
 Text, email, phone (`[tel]` or `[phone]`), textarea, select, checkbox, radio, acceptance, and file upload. Submit buttons are supported. Extra input types (`url`, `number`, `date`) also work.
 
-= Can I import my Contact Form 7 forms? =
+= Can I import forms I already have? =
 
-Yes. Go to 'Oli Contact Forms' > 'Import from CF7' to convert your existing CF7 form tags and mail settings.
+Yes. Go to 'Oli Contact Forms' > 'Import'. Choose a source, preview the fields that cannot be converted, then import the forms you want as drafts. The original forms are left untouched.
 
 = Does it work without JavaScript? =
 
@@ -121,19 +123,29 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 == Screenshots ==
 
-1. Form editor with tag generator buttons
-2. Mail settings configuration
+1. Field builder
+2. Notification list
 3. Form displayed on the frontend
 4. Gutenberg block settings
-5. CF7 importer
+5. Import existing forms
 6. Success message after a submission
 7. Validation errors: required field and invalid email address
 
 == Changelog ==
 
+= 0.4.0 =
+* Forms are a field list (type, name, label, required, choices) stored as JSON. The advanced text form uses attributes, for example `{{field type="email" name="email" required}}`.
+* Mail and Mail (2) are replaced by an extensible notification list, with recipients, subject, body, and a simple condition.
+* Mail tokens are `{field:email}`, `{site:title}`, `{site:url}`, `{site:admin_email}`, and `{submission:date}`.
+* Message keys and the control wrapper class use this plugin's own names (`success`, `required`, `oli-cf-control`).
+* Existing forms are converted once. The previous content is kept and can be restored from the editor. The admin shows a migration report.
+* JSON saved in form meta is slashed before `update_post_meta()`, so newlines and escaped characters survive. A form is converted once and is not rewritten on later loads. The `[contact-form-7]` shortcode remains available for existing embeds.
+* Field types use readable names. Options that do not apply to the selected type stay hidden, including the default value on a submit field. Restoring an original form uses a separate form, asks for confirmation, and reports success. A new form requires consent and keeps a link to the privacy policy, when the site has one, after the form is saved. French labels are included for France and Canada.
+* Import reads Gravity Forms, WPForms, Ninja Forms, Fluent Forms, Formidable Forms, and forms saved for the `contact-form-7` shortcode. Nothing is imported until you confirm a preview, and imports are drafts. Source data is not modified.
+
 = 0.3.12 =
 * Readme: short description now says attachments are "never kept on your site".
-* Security: the CF7 import result notice and the staging notice dismissal verify a nonce before reading the request.
+* Security: the import result notice and the staging notice dismissal verify a nonce before reading the request.
 * Security: mail settings are read through filter_input() and sanitized field by field, without bypassing the input checks.
 * Late escaping: the form markup and the reCAPTCHA widget are escaped with wp_kses() and an explicit allow-list at output.
 * Uninstall uses the %i identifier placeholder for the options table.
@@ -173,20 +185,20 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * No-JS validation is distinguished from a send failure (oli_cf_status=validation|mail_failed). Field values and errors come back via a 5-minute token transient, not the URL.
 * JS error summary names the field and uses singular/plural copy.
 * Status banner (.oli-cf-response-output) is focusable (tabindex="-1") after a no-JS return.
-* Imported CF7 [acceptance] is required by default (with or without *); optional only when the CF7 optional option is present.
+* An imported acceptance field is required by default (with or without a required mark); optional only when the source marks it optional.
 
 = 0.3.2 =
 * reCAPTCHA version is a setting (v2 checkbox or v3 execute). Do not guess the version from the key.
 * v3 siteverify responses without a score are rejected. v2 still accepts success:true.
-* CF7 [file] tags keep limit and filetypes. Paired [acceptance]…[/acceptance] becomes the checkbox label.
+* Imported file fields keep their size limit and allowed types. Paired acceptance markup becomes the checkbox label.
 * AJAX submits are no longer intercepted by the non-AJAX handler (JSON success instead of a 302).
 * Non-JS submits return to the same page (#oli-cf-form-{id}) via a validated hidden permalink.
 * Per-field error messages, required asterisks, stronger focus and contrast styles.
-* Do not register [contact-form-7] while Contact Form 7 is active.
+* Do not register [contact-form-7] while another plugin already provides that shortcode.
 
 = 0.3.1 =
 * Accept reCAPTCHA v2 when siteverify returns success (score threshold is v3 only).
-* Resolve Contact Form 7 special mail-tags such as [_site_admin_email] on send. Fall back to the site admin email when To is empty or invalid.
+* Resolve mail tokens such as {site:admin_email} on send. Fall back to the site admin email when To is empty or invalid.
 * Enforce maxlength and minlength on the server (mb_strlen) and render those attributes in the form HTML.
 
 = 0.3.0 =
@@ -194,8 +206,8 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Remove load_plugin_textdomain(); translations load from WordPress.org language packs.
 * Editable field-level validation messages.
 * File uploads are staged, attached, and deleted immediately after send.
-* CF7 importer converts form tags and mail settings, including Reply-To.
-* Tests for validation, mail build, upload deletion, and CF7 import.
+* The importer converts fields and mail settings, including Reply-To.
+* Tests for validation, mail build, upload deletion, and form import.
 * Author URI https://github.com/olivierbigras (Plugin URI remains the repository URL).
 
 = 0.2.1 =
@@ -210,7 +222,7 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 
 = 0.1.1 =
 * Document Google reCAPTCHA v3 and Cloudflare Turnstile under External services.
-* Move the CF7 importer script into an enqueued file.
+* Move the importer script into an enqueued file.
 * Load front-end scripts only on form pages.
 * Verify the non-AJAX success/error query args with a nonce.
 
@@ -244,13 +256,13 @@ Form editor no longer warns when notification mail meta is missing reply_to (pro
 No-JS status returns land on the message banner. Field borders keep #8c8f94 under common themes.
 
 = 0.3.3 =
-Fixes the AJAX banner crash (self is undefined). Imported CF7 acceptance fields are required unless they use the optional option.
+Fixes the AJAX banner crash (self is undefined). Imported acceptance fields are required unless they use the optional option.
 
 = 0.3.2 =
-Choose reCAPTCHA v2 or v3 in Settings. AJAX success is shown correctly. Imported CF7 file and acceptance fields keep their options and labels.
+Choose reCAPTCHA v2 or v3 in Settings. AJAX success is shown correctly. Imported file and acceptance fields keep their options and labels.
 
 = 0.3.1 =
-Fixes reCAPTCHA v2 rejection, empty imported CF7 recipients, and missing maxlength/minlength checks.
+Fixes reCAPTCHA v2 rejection, empty imported recipients, and missing maxlength/minlength checks.
 
 = 0.3.0 =
 Submissions are email-only. The optional Messages database from 0.2.x is removed. File uploads are still attached to email and then deleted.

@@ -22,8 +22,8 @@ class Oli_CF_Shortcode {
 
 		$settings = get_option( 'oli_cf_settings', array() );
 
-		if ( self::should_register_cf7_compat( $settings ) ) {
-			add_shortcode( 'contact-form-7', array( $this, 'render_cf7_compat_shortcode' ) );
+		if ( self::should_register_legacy_shortcode( $settings ) ) {
+			add_shortcode( 'contact-form-7', array( $this, 'render_legacy_shortcode' ) );
 		}
 	}
 
@@ -52,19 +52,20 @@ class Oli_CF_Shortcode {
 	}
 
 	/**
-	 * Whether the CF7 compatibility shortcode may be registered.
+	 * Whether the legacy shortcode may be registered.
 	 *
-	 * Never steal [contact-form-7] while Contact Form 7 is active.
+	 * It stays off while another plugin already provides that shortcode, or while
+	 * the source that owns it is still active.
 	 *
 	 * @param mixed $settings Plugin settings.
 	 * @return bool
 	 */
-	public static function should_register_cf7_compat( $settings ) {
-		if ( ! is_array( $settings ) || empty( $settings['cf7_compat_enabled'] ) ) {
+	public static function should_register_legacy_shortcode( $settings ) {
+		if ( ! is_array( $settings ) || empty( $settings['legacy_shortcode_compat'] ) ) {
 			return false;
 		}
 
-		if ( defined( 'WPCF7_VERSION' ) || class_exists( 'WPCF7' ) || class_exists( 'WPCF7_ContactForm' ) ) {
+		if ( class_exists( 'Oli_CF_Import_Registry' ) && Oli_CF_Import_Registry::legacy_shortcode_blocked() ) {
 			return false;
 		}
 
@@ -76,12 +77,12 @@ class Oli_CF_Shortcode {
 	}
 
 	/**
-	 * Render CF7 compatibility shortcode.
+	 * Render the legacy shortcode for a form imported from another plugin.
 	 *
 	 * @param array<string, mixed> $atts Shortcode attributes.
 	 * @return string Form HTML.
 	 */
-	public function render_cf7_compat_shortcode( $atts ) {
+	public function render_legacy_shortcode( $atts ) {
 		$atts = shortcode_atts(
 			array(
 				'id' => 0,
@@ -90,9 +91,15 @@ class Oli_CF_Shortcode {
 			'contact-form-7'
 		);
 
-		$cf7_form_id = absint( $atts['id'] );
+		$source_id = absint( $atts['id'] );
 
-		if ( ! $cf7_form_id ) {
+		if ( ! $source_id || ! class_exists( 'Oli_CF_Import_Registry' ) ) {
+			return '';
+		}
+
+		$source = Oli_CF_Import_Registry::legacy_shortcode_source();
+
+		if ( ! $source ) {
 			return '';
 		}
 
@@ -101,11 +108,16 @@ class Oli_CF_Shortcode {
 				'post_type'      => 'oli_contact_form',
 				'posts_per_page' => 1,
 				'post_status'    => 'publish',
-				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- one published form by imported CF7 ID.
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- one published form by its imported source id.
 				'meta_query'     => array(
+					'relation' => 'AND',
 					array(
-						'key'   => '_oli_cf_imported_from_cf7',
-						'value' => $cf7_form_id,
+						'key'   => '_oli_cf_imported_from',
+						'value' => $source->key(),
+					),
+					array(
+						'key'   => '_oli_cf_import_source_id',
+						'value' => (string) $source_id,
 					),
 				),
 			)
@@ -131,9 +143,9 @@ class Oli_CF_Shortcode {
 			return '';
 		}
 
-		$template = get_post_meta( $form_id, '_oli_cf_form_template', true );
+		$fields = Oli_CF_Fields::for_form( $form_id );
 
-		if ( empty( $template ) ) {
+		if ( empty( $fields ) ) {
 			return '';
 		}
 
@@ -155,7 +167,7 @@ class Oli_CF_Shortcode {
 			$error_id   = isset( $_GET['oli_cf_error'] ) ? absint( wp_unslash( $_GET['oli_cf_error'] ) ) : 0;
 
 			if ( $success_id === $form_id || 'success' === $status_query ) {
-				$success_message = $messages['mail_sent_ok'];
+				$success_message = $messages['success'];
 			}
 
 			if ( $error_id === $form_id || in_array( $status_query, array( 'validation', 'mail_failed', 'spam' ), true ) ) {
@@ -180,12 +192,12 @@ class Oli_CF_Shortcode {
 							$error_message = $messages['validation_error'];
 						}
 					} elseif ( '' === $error_message ) {
-						$error_message = $messages['mail_sent_ng'];
+						$error_message = $messages['send_error'];
 					}
 				} elseif ( 'validation' === $status_query ) {
 					$error_message = $messages['validation_error'];
 				} else {
-					$error_message = $messages['mail_sent_ng'];
+					$error_message = $messages['send_error'];
 				}
 			}
 		}
@@ -197,9 +209,9 @@ class Oli_CF_Shortcode {
 		}
 
 		$form_messages = Oli_CF_Validator::normalize_messages( get_post_meta( $form_id, '_oli_cf_messages', true ) );
-		$field_labels  = Oli_CF_Form_Parser::field_labels( $template );
+		$field_labels  = Oli_CF_Fields::label_map( $fields );
 		$has_status    = ( '' !== $success_message || '' !== $error_message );
-		$has_required  = Oli_CF_Form_Parser::template_has_required( $template );
+		$has_required  = Oli_CF_Fields::has_required( $fields );
 		$redirect_to   = self::current_page_url();
 
 		ob_start();
@@ -242,7 +254,7 @@ class Oli_CF_Shortcode {
 					<input type="text" name="oli_cf_hp" id="oli-cf-hp-<?php echo esc_attr( (string) absint( $form_id ) ); ?>" value="" tabindex="-1" autocomplete="off" />
 				</div>
 
-				<?php echo wp_kses( Oli_CF_Form_Parser::parse( $template, $form_id, $field_state ), Oli_CF_Form_Parser::allowed_html() ); ?>
+				<?php echo wp_kses( Oli_CF_Form_Parser::render_fields( $fields, $form_id, $field_state ), Oli_CF_Form_Parser::allowed_html() ); ?>
 
 				<?php echo wp_kses( Oli_CF_Public::recaptcha_widget_html( $form_id, $settings ), Oli_CF_Public::recaptcha_allowed_html() ); ?>
 

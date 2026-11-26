@@ -9,7 +9,7 @@ $tests = array(
 	__DIR__ . '/test-validator.php',
 	__DIR__ . '/test-mailer.php',
 	__DIR__ . '/test-uploads.php',
-	__DIR__ . '/test-cf7-import.php',
+	__DIR__ . '/FormModelTest.php',
 	__DIR__ . '/test-anti-spam.php',
 	__DIR__ . '/test-front.php',
 	__DIR__ . '/MailSanitizeTest.php',
@@ -56,6 +56,37 @@ if ( '' !== $node ) {
 	echo "=== test-public-js.js ===\n";
 	passthru( escapeshellarg( $node ) . ' ' . escapeshellarg( __DIR__ . '/test-public-js.js' ), $code );
 	echo "\n";
+
+	if ( 0 !== (int) $code ) {
+		++$failed;
+	}
+}
+
+echo "=== JsonStorageWpTest.php ===\n";
+passthru( 'bash ' . escapeshellarg( __DIR__ . '/setup-wp-bench.sh' ), $code );
+
+if ( 0 !== (int) $code ) {
+	++$failed;
+} else {
+	$wp_root = getenv( 'OLI_CF_WP_PATH' );
+	$wp_root = is_string( $wp_root ) && '' !== $wp_root ? $wp_root : '/tmp/oli-cf-wp';
+	$wp_cli  = getenv( 'WP_CLI' );
+	$wp_cli  = is_string( $wp_cli ) && '' !== $wp_cli ? $wp_cli : '/tmp/wp-cli.phar';
+	passthru( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( $wp_cli ) . ' --path=' . escapeshellarg( $wp_root ) . ' eval-file ' . escapeshellarg( __DIR__ . '/JsonStorageWpTest.php' ), $code );
+
+	if ( 0 !== (int) $code ) {
+		++$failed;
+	}
+
+	echo "=== LabelLinkWpTest.php ===\n";
+	passthru( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( $wp_cli ) . ' --path=' . escapeshellarg( $wp_root ) . ' eval-file ' . escapeshellarg( __DIR__ . '/LabelLinkWpTest.php' ), $code );
+
+	if ( 0 !== (int) $code ) {
+		++$failed;
+	}
+
+	echo "=== TextareaMailWpTest.php ===\n";
+	passthru( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( $wp_cli ) . ' --path=' . escapeshellarg( $wp_root ) . ' eval-file ' . escapeshellarg( __DIR__ . '/TextareaMailWpTest.php' ), $code );
 
 	if ( 0 !== (int) $code ) {
 		++$failed;

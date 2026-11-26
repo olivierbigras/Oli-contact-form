@@ -21,26 +21,54 @@ class Oli_CF_Validator {
 	 */
 	public static function default_messages() {
 		return array(
-			'mail_sent_ok'          => __( 'Thank you for your message. It has been sent.', 'oli-contact-form' ),
-			'mail_sent_ng'          => __( 'There was an error sending your message. Please try again.', 'oli-contact-form' ),
-			'validation_error'      => __( 'One or more fields have an error. Please check and try again.', 'oli-contact-form' ),
-			'invalid_required'      => __( 'This field is required.', 'oli-contact-form' ),
-			'invalid_email'         => __( 'Please enter a valid email address.', 'oli-contact-form' ),
-			'invalid_tel'           => __( 'Please enter a valid phone number.', 'oli-contact-form' ),
-			'invalid_url'           => __( 'Please enter a valid URL.', 'oli-contact-form' ),
-			'invalid_number'        => __( 'Please enter a valid number.', 'oli-contact-form' ),
-			'invalid_date'          => __( 'Please enter a valid date.', 'oli-contact-form' ),
-			'invalid_too_long'      => __( 'This field is too long.', 'oli-contact-form' ),
-			'invalid_too_short'     => __( 'This field is too short.', 'oli-contact-form' ),
-			'accept_terms'          => __( 'You must accept this to proceed.', 'oli-contact-form' ),
-			'upload_failed'         => __( 'File upload failed.', 'oli-contact-form' ),
-			'upload_file_too_large' => __( 'The uploaded file is too large.', 'oli-contact-form' ),
-			'upload_file_type'      => __( 'This file type is not allowed.', 'oli-contact-form' ),
+			'success'          => __( 'Thank you for your message. It has been sent.', 'oli-contact-form' ),
+			'send_error'       => __( 'There was an error sending your message. Please try again.', 'oli-contact-form' ),
+			'validation_error' => __( 'One or more fields have an error. Please check and try again.', 'oli-contact-form' ),
+			'required'         => __( 'This field is required.', 'oli-contact-form' ),
+			'email'            => __( 'Please enter a valid email address.', 'oli-contact-form' ),
+			'phone'            => __( 'Please enter a valid phone number.', 'oli-contact-form' ),
+			'url'              => __( 'Please enter a valid URL.', 'oli-contact-form' ),
+			'number'           => __( 'Please enter a valid number.', 'oli-contact-form' ),
+			'date'             => __( 'Please enter a valid date.', 'oli-contact-form' ),
+			'too_long'         => __( 'This field is too long.', 'oli-contact-form' ),
+			'too_short'        => __( 'This field is too short.', 'oli-contact-form' ),
+			'acceptance'       => __( 'You must accept this to proceed.', 'oli-contact-form' ),
+			'upload_failed'    => __( 'File upload failed.', 'oli-contact-form' ),
+			'file_too_large'   => __( 'The uploaded file is too large.', 'oli-contact-form' ),
+			'file_type'        => __( 'This file type is not allowed.', 'oli-contact-form' ),
+		);
+	}
+
+	/**
+	 * Previous message keys, including keys used by imported sources.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function legacy_message_keys() {
+		return array(
+			'mail_sent_ok'             => 'success',
+			'mail_sent_ng'             => 'send_error',
+			'validation_error'         => 'validation_error',
+			'invalid_required'         => 'required',
+			'invalid_email'            => 'email',
+			'invalid_tel'              => 'phone',
+			'invalid_url'              => 'url',
+			'invalid_number'           => 'number',
+			'invalid_date'             => 'date',
+			'invalid_too_long'         => 'too_long',
+			'invalid_too_short'        => 'too_short',
+			'accept_terms'             => 'acceptance',
+			'upload_failed'            => 'upload_failed',
+			'upload_file_too_large'    => 'file_too_large',
+			'upload_file_type'         => 'file_type',
+			'upload_file_type_invalid' => 'file_type',
 		);
 	}
 
 	/**
 	 * Merge saved messages with defaults.
+	 *
+	 * Older keys are copied onto the current keys when the current key is still empty.
 	 *
 	 * @param mixed $messages Saved messages.
 	 * @return array<string, string>
@@ -52,9 +80,19 @@ class Oli_CF_Validator {
 			return $defaults;
 		}
 
+		$incoming = $messages;
+
+		foreach ( self::legacy_message_keys() as $old_key => $new_key ) {
+			if ( isset( $messages[ $old_key ] ) && is_string( $messages[ $old_key ] ) && '' !== trim( $messages[ $old_key ] ) ) {
+				if ( ! isset( $incoming[ $new_key ] ) || ! is_string( $incoming[ $new_key ] ) || '' === trim( $incoming[ $new_key ] ) ) {
+					$incoming[ $new_key ] = $messages[ $old_key ];
+				}
+			}
+		}
+
 		foreach ( $defaults as $key => $default ) {
-			if ( isset( $messages[ $key ] ) && is_string( $messages[ $key ] ) && '' !== trim( $messages[ $key ] ) ) {
-				$defaults[ $key ] = $messages[ $key ];
+			if ( isset( $incoming[ $key ] ) && is_string( $incoming[ $key ] ) && '' !== trim( $incoming[ $key ] ) ) {
+				$defaults[ $key ] = $incoming[ $key ];
 			}
 		}
 
@@ -73,7 +111,12 @@ class Oli_CF_Validator {
 	public static function validate( $data, $template, $files = array(), $messages = null ) {
 		$messages = self::normalize_messages( $messages );
 		$errors   = array();
-		$fields   = Oli_CF_Form_Parser::parse_fields( $template );
+
+		if ( is_array( $template ) ) {
+			$fields = Oli_CF_Fields::to_parser_fields( $template );
+		} else {
+			$fields = Oli_CF_Form_Parser::parse_fields( $template );
+		}
 
 		if ( empty( $fields ) ) {
 			return true;
@@ -120,19 +163,19 @@ class Oli_CF_Validator {
 		if ( $required ) {
 			if ( 'file' === $type ) {
 				if ( empty( $files[ $name ] ) || ! Oli_CF_Uploads::file_was_uploaded( $files[ $name ] ) ) {
-					return $messages['invalid_required'];
+					return $messages['required'];
 				}
 			} elseif ( 'checkbox' === $type ) {
 				if ( empty( $value ) || ! is_array( $value ) ) {
-					return $messages['invalid_required'];
+					return $messages['required'];
 				}
 			} elseif ( 'acceptance' === $type ) {
 				if ( empty( $value ) || '1' !== (string) $value ) {
-					return $messages['accept_terms'];
+					return $messages['acceptance'];
 				}
 			} elseif ( '' === $value || false === $value || ( is_array( $value ) && empty( $value ) ) ) {
 				if ( '0' !== $value ) {
-					return $messages['invalid_required'];
+					return $messages['required'];
 				}
 			}
 		}
@@ -156,33 +199,33 @@ class Oli_CF_Validator {
 		switch ( $type ) {
 			case 'email':
 				if ( ! is_email( $value ) ) {
-					return $messages['invalid_email'];
+					return $messages['email'];
 				}
 				break;
 
 			case 'url':
 				if ( ! filter_var( $value, FILTER_VALIDATE_URL ) ) {
-					return $messages['invalid_url'];
+					return $messages['url'];
 				}
 				break;
 
 			case 'tel':
 			case 'phone':
 				if ( ! preg_match( '/^[\d\s\+\-\(\)]+$/', (string) $value ) ) {
-					return $messages['invalid_tel'];
+					return $messages['phone'];
 				}
 				break;
 
 			case 'number':
 				if ( ! is_numeric( $value ) ) {
-					return $messages['invalid_number'];
+					return $messages['number'];
 				}
 				break;
 
 			case 'date':
 				$timestamp = strtotime( (string) $value );
 				if ( false === $timestamp ) {
-					return $messages['invalid_date'];
+					return $messages['date'];
 				}
 				break;
 		}
@@ -206,7 +249,7 @@ class Oli_CF_Validator {
 			$max = (int) $attrs['maxlength'];
 
 			if ( $max > 0 && $len > $max ) {
-				return isset( $messages['invalid_too_long'] ) ? $messages['invalid_too_long'] : __( 'This field is too long.', 'oli-contact-form' );
+				return isset( $messages['too_long'] ) ? $messages['too_long'] : __( 'This field is too long.', 'oli-contact-form' );
 			}
 		}
 
@@ -214,7 +257,7 @@ class Oli_CF_Validator {
 			$min = (int) $attrs['minlength'];
 
 			if ( $min > 0 && $len < $min ) {
-				return isset( $messages['invalid_too_short'] ) ? $messages['invalid_too_short'] : __( 'This field is too short.', 'oli-contact-form' );
+				return isset( $messages['too_short'] ) ? $messages['too_short'] : __( 'This field is too short.', 'oli-contact-form' );
 			}
 		}
 
@@ -250,7 +293,7 @@ class Oli_CF_Validator {
 			switch ( (int) $file['error'] ) {
 				case UPLOAD_ERR_INI_SIZE:
 				case UPLOAD_ERR_FORM_SIZE:
-					return $messages['upload_file_too_large'];
+					return $messages['file_too_large'];
 				default:
 					return $messages['upload_failed'];
 			}
@@ -274,7 +317,7 @@ class Oli_CF_Validator {
 		$ext     = strtolower( pathinfo( isset( $file['name'] ) ? $file['name'] : '', PATHINFO_EXTENSION ) );
 
 		if ( in_array( $ext, Oli_CF_Uploads::BLOCKED_EXTENSIONS, true ) ) {
-			return $messages['upload_file_type'];
+			return $messages['file_type'];
 		}
 
 		if ( ! empty( $allowed ) && ! in_array( $ext, $allowed, true ) ) {
@@ -295,7 +338,7 @@ class Oli_CF_Validator {
 			$mime = Oli_CF_Uploads::file_mime_type( $tmp );
 
 			if ( '' !== $mime && 0 !== strpos( $mime, 'image/' ) ) {
-				return $messages['upload_file_type'];
+				return $messages['file_type'];
 			}
 		}
 
@@ -305,11 +348,11 @@ class Oli_CF_Validator {
 			$real_type = ( ! empty( $checked['type'] ) && is_string( $checked['type'] ) ) ? $checked['type'] : '';
 
 			if ( '' === $real_ext || '' === $real_type || $real_ext !== $ext ) {
-				return $messages['upload_file_type'];
+				return $messages['file_type'];
 			}
 
 			if ( ! empty( $allowed ) && ! in_array( $real_ext, $allowed, true ) ) {
-				return $messages['upload_file_type'];
+				return $messages['file_type'];
 			}
 		}
 

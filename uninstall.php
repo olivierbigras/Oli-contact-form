@@ -26,6 +26,12 @@ function oli_cf_uninstall_current_site() {
 
 	delete_option( 'oli_cf_settings' );
 	delete_option( 'oli_cf_db_version' );
+	delete_option( 'oli_cf_upgrade_routines' );
+	delete_option( 'oli_cf_migration_report' );
+	delete_option( 'oli_cf_migration_report_dismissed' );
+
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- uninstall removes the per-user conversion notice flag.
+	$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE meta_key = %s', $wpdb->usermeta, 'oli_cf_migration_dismissed' ) );
 	delete_option( Oli_CF_Uploads::NOTICE_OPTION );
 
 	wp_clear_scheduled_hook( 'oli_cf_purge_stored_messages' );

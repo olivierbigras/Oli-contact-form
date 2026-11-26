@@ -1,6 +1,6 @@
 <?php
 /**
- * Parse CF7-like tag syntax and generate HTML.
+ * Render form fields as HTML.
  *
  * @package Oli_Contact_Form
  */
@@ -31,12 +31,18 @@ class Oli_CF_Form_Parser {
 	/**
 	 * Parse form template and return HTML.
 	 *
-	 * @param string               $template Form template with CF7-like tags.
+	 * @param string|array<int, array<string, mixed>> $template Field list, text form, or a previous template.
 	 * @param int                  $form_id  Form ID.
 	 * @param array<string, mixed> $state    Optional values/errors to replay after a no-JS submit.
 	 * @return string Parsed HTML.
 	 */
 	public static function parse( $template, $form_id, $state = array() ) {
+		if ( is_array( $template ) || self::is_field_markup( $template ) ) {
+			$fields = is_array( $template ) ? $template : Oli_CF_Fields::from_markup( (string) $template );
+
+			return self::render_fields( $fields, $form_id, $state );
+		}
+
 		self::$render_state = is_array( $state ) ? $state : array();
 
 		$html = self::normalize_template( $template );
@@ -63,6 +69,14 @@ class Oli_CF_Form_Parser {
 	 * @return array<int, array<string, mixed>>
 	 */
 	public static function parse_fields( $template ) {
+		if ( is_array( $template ) ) {
+			return Oli_CF_Fields::to_parser_fields( $template );
+		}
+
+		if ( self::is_field_markup( $template ) ) {
+			return Oli_CF_Fields::to_parser_fields( Oli_CF_Fields::from_markup( (string) $template ) );
+		}
+
 		$fields = array();
 
 		preg_match_all( '/\[([^\]]+)\]/', self::normalize_template( $template ), $matches );
@@ -82,6 +96,52 @@ class Oli_CF_Form_Parser {
 		}
 
 		return $fields;
+	}
+
+	/**
+	 * Render a field list, including each field's label.
+	 *
+	 * @param array<int, array<string, mixed>> $fields  Fields.
+	 * @param int                              $form_id Form ID.
+	 * @param array<string, mixed>             $state   Optional values and errors.
+	 * @return string
+	 */
+	public static function render_fields( $fields, $form_id, $state = array() ) {
+		self::$render_state = is_array( $state ) ? $state : array();
+		$html               = '';
+
+		foreach ( Oli_CF_Fields::to_parser_fields( $fields ) as $field ) {
+			$control = self::render_parsed_field( $field, (int) $form_id );
+
+			if ( '' === $control ) {
+				continue;
+			}
+
+			$type  = isset( $field['type'] ) ? $field['type'] : '';
+			$label = isset( $field['label'] ) ? (string) $field['label'] : '';
+
+			if ( in_array( $type, array( 'submit', 'hidden', 'acceptance' ), true ) || '' === $label ) {
+				$html .= $control;
+				continue;
+			}
+
+			$html .= '<label> ' . esc_html( $label ) . "\n    " . $control . ' </label>';
+		}
+
+		$html               = self::inject_required_marks( $html );
+		self::$render_state = array();
+
+		return self::kses( (string) $html );
+	}
+
+	/**
+	 * Whether a string is the current text form.
+	 *
+	 * @param mixed $template Template.
+	 * @return bool
+	 */
+	private static function is_field_markup( $template ) {
+		return is_string( $template ) && Oli_CF_Fields::is_markup( $template );
 	}
 
 	/**
@@ -149,7 +209,7 @@ class Oli_CF_Form_Parser {
 	}
 
 	/**
-	 * Whether a tag has an unquoted option such as CF7 `optional`.
+	 * Whether a tag has an unquoted option such as optional.
 	 *
 	 * @param string $tag    Tag content without brackets.
 	 * @param string $option Option name.
@@ -322,7 +382,7 @@ class Oli_CF_Form_Parser {
 	}
 
 	/**
-	 * Expand CF7 paired tags such as [acceptance]label[/acceptance].
+	 * Expand paired acceptance tags saved by a previous version.
 	 *
 	 * @param string $template Form template.
 	 * @return string
@@ -382,6 +442,12 @@ class Oli_CF_Form_Parser {
 	 * @return array<string, string>
 	 */
 	public static function field_labels( $template ) {
+		if ( is_array( $template ) || self::is_field_markup( $template ) ) {
+			$fields = is_array( $template ) ? $template : Oli_CF_Fields::from_markup( (string) $template );
+
+			return Oli_CF_Fields::label_map( $fields );
+		}
+
 		$labels     = array();
 		$normalized = self::normalize_template( $template );
 
@@ -530,9 +596,28 @@ class Oli_CF_Form_Parser {
 				return self::render_file( $name, $required, $attrs, $form_id );
 			case 'submit':
 				return self::render_submit( $values, $form_id );
+			case 'hidden':
+				return self::render_hidden( $name, $attrs );
 			default:
 				return '';
 		}
+	}
+
+	/**
+	 * Render a hidden input.
+	 *
+	 * @param string               $name  Field name.
+	 * @param array<string,string> $attrs Field attributes.
+	 * @return string
+	 */
+	private static function render_hidden( $name, $attrs ) {
+		$value = isset( $attrs['default'] ) ? $attrs['default'] : '';
+
+		return sprintf(
+			'<input type="hidden" name="%s" value="%s" class="oli-cf-hidden" />',
+			esc_attr( $name ),
+			esc_attr( $value )
+		);
 	}
 
 	/**
@@ -556,7 +641,7 @@ class Oli_CF_Form_Parser {
 		$posted      = self::state_value( $name );
 		$value       = ( null !== $posted && ! is_array( $posted ) ) ? (string) $posted : $default;
 
-		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
+		$html  = sprintf( '<span class="oli-cf-control" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
 			'<input type="%s" name="%s" id="%s" class="%s" value="%s"%s%s%s%s />',
 			esc_attr( $html_type ),
@@ -604,7 +689,7 @@ class Oli_CF_Form_Parser {
 			$cols = 40;
 		}
 
-		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
+		$html  = sprintf( '<span class="oli-cf-control" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
 			'<textarea name="%s" id="%s" class="%s" rows="%d" cols="%d"%s%s%s%s>%s</textarea>',
 			esc_attr( $name ),
@@ -641,7 +726,7 @@ class Oli_CF_Form_Parser {
 		$posted = self::state_value( $name );
 		$posted = ( null !== $posted && ! is_array( $posted ) ) ? (string) $posted : null;
 
-		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
+		$html  = sprintf( '<span class="oli-cf-control" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
 			'<select name="%s" id="%s" class="%s"%s%s>',
 			esc_attr( $name ),
@@ -694,7 +779,7 @@ class Oli_CF_Form_Parser {
 			$chosen = array( $posted );
 		}
 
-		$html = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
+		$html = sprintf( '<span class="oli-cf-control" data-name="%s">', esc_attr( $name ) );
 
 		foreach ( $values as $index => $option ) {
 			$checkbox_id = $id . '-' . absint( $index );
@@ -735,7 +820,7 @@ class Oli_CF_Form_Parser {
 		$posted = self::state_value( $name );
 		$posted = ( null !== $posted && ! is_array( $posted ) ) ? (string) $posted : null;
 
-		$html = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
+		$html = sprintf( '<span class="oli-cf-control" data-name="%s">', esc_attr( $name ) );
 
 		foreach ( $values as $index => $option ) {
 			$radio_id = $id . '-' . absint( $index );
@@ -777,7 +862,7 @@ class Oli_CF_Form_Parser {
 		$posted  = self::state_value( $name );
 		$checked = ( null !== $posted && '1' === (string) $posted ) ? ' checked="checked"' : '';
 
-		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
+		$html  = sprintf( '<span class="oli-cf-control" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
 			'<span class="oli-cf-list-item"><label><input type="checkbox" name="%s" value="1" id="%s" class="%s"%s%s%s /><span class="oli-cf-list-item-label">%s</span></label></span>',
 			esc_attr( $name ),
@@ -812,7 +897,7 @@ class Oli_CF_Form_Parser {
 		$limit  = isset( $attrs['limit'] ) ? $attrs['limit'] : Oli_CF_Uploads::DEFAULT_LIMIT;
 		$accept = Oli_CF_Uploads::accept_attribute( $types );
 
-		$html  = sprintf( '<span class="oli-cf-form-control-wrap" data-name="%s">', esc_attr( $name ) );
+		$html  = sprintf( '<span class="oli-cf-control" data-name="%s">', esc_attr( $name ) );
 		$html .= sprintf(
 			'<input type="file" name="%s" id="%s" class="%s"%s%s data-size-limit="%s" data-filetypes="%s"%s />',
 			esc_attr( $name ),

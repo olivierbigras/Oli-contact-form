@@ -1,6 +1,6 @@
 <?php
 /**
- * Meta boxes for form edit screen.
+ * Meta boxes for the form editor.
  *
  * @package Oli_Contact_Form
  */
@@ -20,7 +20,7 @@ class Oli_CF_Meta_Boxes {
 	public function add_meta_boxes() {
 		add_meta_box(
 			'oli_cf_form_editor',
-			__( 'Form', 'oli-contact-form' ),
+			__( 'Fields', 'oli-contact-form' ),
 			array( $this, 'render_form_editor' ),
 			'oli_contact_form',
 			'normal',
@@ -28,18 +28,9 @@ class Oli_CF_Meta_Boxes {
 		);
 
 		add_meta_box(
-			'oli_cf_mail_settings',
-			__( 'Mail', 'oli-contact-form' ),
-			array( $this, 'render_mail_settings' ),
-			'oli_contact_form',
-			'normal',
-			'high'
-		);
-
-		add_meta_box(
-			'oli_cf_mail_2_settings',
-			__( 'Mail (2)', 'oli-contact-form' ),
-			array( $this, 'render_mail_2_settings' ),
+			'oli_cf_notifications',
+			__( 'Notifications', 'oli-contact-form' ),
+			array( $this, 'render_notifications' ),
 			'oli_contact_form',
 			'normal',
 			'high'
@@ -65,127 +56,322 @@ class Oli_CF_Meta_Boxes {
 	}
 
 	/**
-	 * Render form editor meta box.
+	 * Render the field builder.
 	 *
 	 * @param WP_Post $post Post object.
 	 */
 	public function render_form_editor( $post ) {
 		wp_nonce_field( 'oli_cf_save_form', 'oli_cf_nonce' );
 
-		$template = get_post_meta( $post->ID, '_oli_cf_form_template', true );
+		$fields = Oli_CF_Fields::for_form( $post->ID );
 
-		if ( empty( $template ) ) {
-			$template = $this->get_default_template();
+		if ( empty( $fields ) ) {
+			$fields = Oli_CF_Fields::defaults();
+		}
+
+		$fields[] = Oli_CF_Fields::blank();
+		?>
+		<div class="oli-cf-builder" id="oli-cf-fields" tabindex="-1">
+			<p class="description">
+				<?php esc_html_e( 'Add each field below. Required fields are marked on the form. Choices go on separate lines.', 'oli-contact-form' ); ?>
+			</p>
+			<div class="oli-cf-repeater" data-oli-repeater="fields">
+				<?php foreach ( $fields as $index => $field ) : ?>
+					<?php $this->render_field_row( $index, $field, false ); ?>
+				<?php endforeach; ?>
+			</div>
+			<p>
+				<button type="button" class="button oli-cf-add-row" data-oli-target="fields"><?php esc_html_e( 'Add field', 'oli-contact-form' ); ?></button>
+			</p>
+			<details class="oli-cf-advanced">
+				<summary><?php esc_html_e( 'Advanced text definition', 'oli-contact-form' ); ?></summary>
+				<p class="description">
+					<?php esc_html_e( 'The field list above is what gets saved. You can replace it from this text form, for example {{field type="email" name="email" label="Email" required}}.', 'oli-contact-form' ); ?>
+				</p>
+				<textarea name="oli_cf_fields_markup" rows="8" class="large-text code"><?php echo esc_textarea( Oli_CF_Fields::to_markup( Oli_CF_Fields::for_form( $post->ID ) ? Oli_CF_Fields::for_form( $post->ID ) : Oli_CF_Fields::defaults() ) ); ?></textarea>
+				<p>
+					<label>
+						<input type="checkbox" name="oli_cf_use_markup" value="1" />
+						<?php esc_html_e( 'Replace the fields from this text definition on save', 'oli-contact-form' ); ?>
+					</label>
+				</p>
+			</details>
+			<?php $this->render_restore_control( $post->ID ); ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render one field row.
+	 *
+	 * @param int                  $index    Row index.
+	 * @param array<string, mixed> $field    Field.
+	 * @param bool                 $template Whether this row is a clone template.
+	 */
+	private function render_field_row( $index, $field, $template ) {
+		$name = $template ? '__INDEX__' : (string) $index;
+		$type = isset( $field['type'] ) ? Oli_CF_Fields::normalize_type( $field['type'] ) : 'text';
+
+		if ( ! in_array( $type, Oli_CF_Fields::types(), true ) ) {
+			$type = 'text';
 		}
 		?>
-		<div class="oli-cf-form-editor">
-			<div class="oli-cf-tag-generator">
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="text"><?php esc_html_e( 'text', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="email"><?php esc_html_e( 'email', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="tel"><?php esc_html_e( 'phone', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="textarea"><?php esc_html_e( 'textarea', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="select"><?php esc_html_e( 'select', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="checkbox"><?php esc_html_e( 'checkbox', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="radio"><?php esc_html_e( 'radio', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="acceptance"><?php esc_html_e( 'acceptance', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="file"><?php esc_html_e( 'file', 'oli-contact-form' ); ?></button>
-				<button type="button" class="button oli-cf-tag-gen" data-tag-type="submit"><?php esc_html_e( 'submit', 'oli-contact-form' ); ?></button>
-			</div>
-			<textarea name="oli_cf_form_template" id="oli-cf-form-template" rows="15" class="large-text code"><?php echo esc_textarea( $template ); ?></textarea>
-			<p class="description">
-				<?php esc_html_e( 'Use CF7-like tag syntax. Example: [text* your-name placeholder:"Your name"] [email* your-email] [textarea your-message] [submit "Send"]', 'oli-contact-form' ); ?>
+		<div class="oli-cf-repeater-row oli-cf-type-<?php echo esc_attr( $type ); ?>">
+			<p>
+				<label>
+					<?php esc_html_e( 'Type', 'oli-contact-form' ); ?>
+					<select name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][type]">
+						<?php foreach ( Oli_CF_Fields::type_labels() as $type_id => $type_label ) : ?>
+							<option value="<?php echo esc_attr( $type_id ); ?>" <?php selected( $field['type'], $type_id ); ?>><?php echo esc_html( $type_label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+				<label>
+					<?php esc_html_e( 'Name', 'oli-contact-form' ); ?>
+					<input type="text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][name]" value="<?php echo esc_attr( $field['name'] ); ?>" />
+				</label>
+				<label>
+					<?php esc_html_e( 'Label', 'oli-contact-form' ); ?>
+					<input type="text" class="regular-text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][label]" value="<?php echo esc_attr( $field['label'] ); ?>" />
+				</label>
+				<label class="oli-cf-required-option">
+					<input type="checkbox" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][required]" value="1" <?php checked( ! empty( $field['required'] ) ); ?> />
+					<?php esc_html_e( 'Required', 'oli-contact-form' ); ?>
+				</label>
+				<button type="button" class="button-link oli-cf-remove-row"><?php esc_html_e( 'Remove', 'oli-contact-form' ); ?></button>
+			</p>
+			<p>
+				<label class="oli-cf-placeholder-options">
+					<?php esc_html_e( 'Placeholder', 'oli-contact-form' ); ?>
+					<input type="text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][placeholder]" value="<?php echo esc_attr( $field['placeholder'] ); ?>" />
+				</label>
+				<label class="oli-cf-default-option">
+					<?php esc_html_e( 'Default', 'oli-contact-form' ); ?>
+					<input type="text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][default]" value="<?php echo esc_attr( $field['default'] ); ?>" />
+				</label>
+				<label class="oli-cf-length-options">
+					<?php esc_html_e( 'Min length', 'oli-contact-form' ); ?>
+					<input type="text" class="small-text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][minlength]" value="<?php echo esc_attr( $field['minlength'] ); ?>" />
+				</label>
+				<label class="oli-cf-length-options">
+					<?php esc_html_e( 'Max length', 'oli-contact-form' ); ?>
+					<input type="text" class="small-text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][maxlength]" value="<?php echo esc_attr( $field['maxlength'] ); ?>" />
+				</label>
+			</p>
+			<p class="oli-cf-choice-options">
+				<label>
+					<?php esc_html_e( 'Choices (one per line)', 'oli-contact-form' ); ?>
+					<textarea name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][options]" rows="3" class="large-text"><?php echo esc_textarea( implode( "\n", $field['options'] ) ); ?></textarea>
+				</label>
+			</p>
+			<p class="oli-cf-file-options">
+				<label>
+					<?php esc_html_e( 'File size limit', 'oli-contact-form' ); ?>
+					<input type="text" class="small-text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][limit]" value="<?php echo esc_attr( $field['limit'] ); ?>" placeholder="2mb" />
+				</label>
+				<label>
+					<?php esc_html_e( 'File types', 'oli-contact-form' ); ?>
+					<input type="text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][filetypes]" value="<?php echo esc_attr( $field['filetypes'] ); ?>" placeholder="pdf|jpg" />
+				</label>
 			</p>
 		</div>
 		<?php
 	}
 
 	/**
-	 * Render mail settings meta box.
+	 * Render the notification list.
 	 *
 	 * @param WP_Post $post Post object.
 	 */
-	public function render_mail_settings( $post ) {
-		$mail = wp_parse_args( (array) get_post_meta( $post->ID, '_oli_cf_mail', true ), $this->get_default_mail() );
+	public function render_notifications( $post ) {
+		$notifications   = Oli_CF_Notifications::for_editor( $post->ID );
+		$notifications[] = Oli_CF_Notifications::blank();
 		?>
-		<table class="form-table">
-			<tr>
-				<th><label for="oli-cf-mail-to"><?php esc_html_e( 'To', 'oli-contact-form' ); ?></label></th>
-				<td><input type="text" name="oli_cf_mail[to]" id="oli-cf-mail-to" value="<?php echo esc_attr( $mail['to'] ); ?>" class="large-text" /></td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-mail-from"><?php esc_html_e( 'From', 'oli-contact-form' ); ?></label></th>
-				<td>
-					<input type="text" name="oli_cf_mail[from]" id="oli-cf-mail-from" value="<?php echo esc_attr( $mail['from'] ); ?>" class="large-text" />
-					<p class="description"><?php esc_html_e( 'Use the site admin email. Putting the visitor address in From often fails SPF/DMARC. Put [your-email] in Reply-To instead.', 'oli-contact-form' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-mail-subject"><?php esc_html_e( 'Subject', 'oli-contact-form' ); ?></label></th>
-				<td><input type="text" name="oli_cf_mail[subject]" id="oli-cf-mail-subject" value="<?php echo esc_attr( $mail['subject'] ); ?>" class="large-text" /></td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-mail-body"><?php esc_html_e( 'Message Body', 'oli-contact-form' ); ?></label></th>
-				<td>
-					<textarea name="oli_cf_mail[body]" id="oli-cf-mail-body" rows="10" class="large-text code"><?php echo esc_textarea( $mail['body'] ); ?></textarea>
-					<p class="description"><?php esc_html_e( 'Use [field-name] to insert field values.', 'oli-contact-form' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-mail-reply-to"><?php esc_html_e( 'Reply-To', 'oli-contact-form' ); ?></label></th>
-				<td><input type="text" name="oli_cf_mail[reply_to]" id="oli-cf-mail-reply-to" value="<?php echo esc_attr( $mail['reply_to'] ); ?>" class="large-text" /></td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-mail-additional-headers"><?php esc_html_e( 'Additional Headers', 'oli-contact-form' ); ?></label></th>
-				<td><textarea name="oli_cf_mail[additional_headers]" id="oli-cf-mail-additional-headers" rows="3" class="large-text code"><?php echo esc_textarea( $mail['additional_headers'] ); ?></textarea></td>
-			</tr>
-		</table>
+		<div class="oli-cf-builder" id="oli-cf-notifications">
+			<p class="description">
+				<?php esc_html_e( 'Each notification is a separate email. Use tokens such as {field:email}, {site:title}, {site:admin_email}, and {submission:date}. Put the visitor address in Reply-To, not From, so mail is less likely to be rejected.', 'oli-contact-form' ); ?>
+			</p>
+			<div class="oli-cf-repeater" data-oli-repeater="notifications">
+				<?php foreach ( $notifications as $index => $notification ) : ?>
+					<?php $this->render_notification_row( $index, $notification ); ?>
+				<?php endforeach; ?>
+			</div>
+			<p>
+				<button type="button" class="button oli-cf-add-row" data-oli-target="notifications"><?php esc_html_e( 'Add notification', 'oli-contact-form' ); ?></button>
+			</p>
+		</div>
 		<?php
 	}
 
 	/**
-	 * Render mail 2 settings meta box.
+	 * Render one notification.
 	 *
-	 * @param WP_Post $post Post object.
+	 * @param int                  $index        Row index.
+	 * @param array<string, mixed> $notification Notification.
 	 */
-	public function render_mail_2_settings( $post ) {
-		$mail_2 = wp_parse_args( (array) get_post_meta( $post->ID, '_oli_cf_mail_2', true ), $this->get_default_mail_2() );
+	private function render_notification_row( $index, $notification ) {
+		$name      = (string) $index;
+		$condition = isset( $notification['condition'] ) && is_array( $notification['condition'] ) ? $notification['condition'] : array();
+		$operator  = isset( $condition['operator'] ) ? sanitize_key( (string) $condition['operator'] ) : 'always';
+
+		if ( ! array_key_exists( $operator, Oli_CF_Notifications::operators() ) ) {
+			$operator = 'always';
+		}
+		?>
+		<fieldset class="oli-cf-repeater-row oli-cf-condition-<?php echo esc_attr( $operator ); ?>">
+			<legend>
+				<?php echo esc_html( '' !== $notification['label'] ? $notification['label'] : __( 'Notification', 'oli-contact-form' ) ); ?>
+			</legend>
+			<input type="hidden" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][id]" value="<?php echo esc_attr( $notification['id'] ); ?>" />
+			<p>
+				<label>
+					<?php esc_html_e( 'Label', 'oli-contact-form' ); ?>
+					<input type="text" class="regular-text" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][label]" value="<?php echo esc_attr( $notification['label'] ); ?>" />
+				</label>
+				<label>
+					<input type="checkbox" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][enabled]" value="1" <?php checked( ! empty( $notification['enabled'] ) ); ?> />
+					<?php esc_html_e( 'Enabled', 'oli-contact-form' ); ?>
+				</label>
+				<button type="button" class="button-link oli-cf-remove-row"><?php esc_html_e( 'Remove', 'oli-contact-form' ); ?></button>
+			</p>
+			<p>
+				<label>
+					<?php esc_html_e( 'To', 'oli-contact-form' ); ?>
+					<input type="text" class="large-text" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][to]" value="<?php echo esc_attr( $notification['to'] ); ?>" />
+				</label>
+			</p>
+			<p>
+				<label>
+					<?php esc_html_e( 'From', 'oli-contact-form' ); ?>
+					<input type="text" class="large-text" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][from]" value="<?php echo esc_attr( $notification['from'] ); ?>" />
+				</label>
+			</p>
+			<p>
+				<label>
+					<?php esc_html_e( 'Reply-To', 'oli-contact-form' ); ?>
+					<input type="text" class="large-text" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][reply_to]" value="<?php echo esc_attr( $notification['reply_to'] ); ?>" />
+				</label>
+			</p>
+			<p>
+				<label>
+					<?php esc_html_e( 'Subject', 'oli-contact-form' ); ?>
+					<input type="text" class="large-text" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][subject]" value="<?php echo esc_attr( $notification['subject'] ); ?>" />
+				</label>
+			</p>
+			<p>
+				<label>
+					<?php esc_html_e( 'Body', 'oli-contact-form' ); ?>
+					<textarea name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][body]" rows="6" class="large-text code"><?php echo esc_textarea( $notification['body'] ); ?></textarea>
+				</label>
+			</p>
+			<p>
+				<label>
+					<?php esc_html_e( 'Extra headers', 'oli-contact-form' ); ?>
+					<textarea name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][headers]" rows="2" class="large-text code"><?php echo esc_textarea( $notification['headers'] ); ?></textarea>
+				</label>
+			</p>
+			<p class="oli-cf-condition">
+				<label>
+					<?php esc_html_e( 'Condition', 'oli-contact-form' ); ?>
+					<select name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][condition_operator]">
+						<?php foreach ( Oli_CF_Notifications::operators() as $operator_id => $operator_label ) : ?>
+							<option value="<?php echo esc_attr( $operator_id ); ?>" <?php selected( $operator, $operator_id ); ?>><?php echo esc_html( $operator_label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+				<label class="oli-cf-condition-field">
+					<?php esc_html_e( 'Field name', 'oli-contact-form' ); ?>
+					<input type="text" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][condition_field]" value="<?php echo esc_attr( isset( $condition['field'] ) ? $condition['field'] : '' ); ?>" />
+				</label>
+				<label class="oli-cf-condition-value">
+					<?php esc_html_e( 'Value', 'oli-contact-form' ); ?>
+					<input type="text" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][condition_value]" value="<?php echo esc_attr( isset( $condition['value'] ) ? $condition['value'] : '' ); ?>" />
+				</label>
+			</p>
+		</fieldset>
+		<?php
+	}
+
+	/**
+	 * Offer a restore when an original copy was saved.
+	 *
+	 * @param int $post_id Form ID.
+	 */
+	private function render_restore_control( $post_id ) {
+		$backup = get_post_meta( $post_id, '_oli_cf_legacy_template', true );
+
+		if ( ! is_string( $backup ) || '' === $backup ) {
+			return;
+		}
+
+		$action = admin_url( 'admin-post.php' );
 		?>
 		<p>
-			<label>
-				<input type="checkbox" name="oli_cf_mail_2[enabled]" value="1" <?php checked( ! empty( $mail_2['enabled'] ) ); ?> />
-				<?php esc_html_e( 'Enable confirmation email to the sender (Mail 2)', 'oli-contact-form' ); ?>
-			</label>
+			<button type="submit" class="button" form="oli-cf-restore-form" formaction="<?php echo esc_url( $action ); ?>"><?php esc_html_e( 'Restore the original form', 'oli-contact-form' ); ?></button>
+			<span class="description"><?php esc_html_e( 'Rebuilds the fields and notifications from the copy saved before the update. The copy itself is kept.', 'oli-contact-form' ); ?></span>
 		</p>
-		<table class="form-table">
-			<tr>
-				<th><label for="oli-cf-mail-2-to"><?php esc_html_e( 'To', 'oli-contact-form' ); ?></label></th>
-				<td><input type="text" name="oli_cf_mail_2[to]" id="oli-cf-mail-2-to" value="<?php echo esc_attr( $mail_2['to'] ); ?>" class="large-text" /></td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-mail-2-from"><?php esc_html_e( 'From', 'oli-contact-form' ); ?></label></th>
-				<td><input type="text" name="oli_cf_mail_2[from]" id="oli-cf-mail-2-from" value="<?php echo esc_attr( $mail_2['from'] ); ?>" class="large-text" /></td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-mail-2-subject"><?php esc_html_e( 'Subject', 'oli-contact-form' ); ?></label></th>
-				<td><input type="text" name="oli_cf_mail_2[subject]" id="oli-cf-mail-2-subject" value="<?php echo esc_attr( $mail_2['subject'] ); ?>" class="large-text" /></td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-mail-2-body"><?php esc_html_e( 'Message Body', 'oli-contact-form' ); ?></label></th>
-				<td>
-					<textarea name="oli_cf_mail_2[body]" id="oli-cf-mail-2-body" rows="10" class="large-text code"><?php echo esc_textarea( $mail_2['body'] ); ?></textarea>
-					<p class="description"><?php esc_html_e( 'Use [field-name] to insert field values.', 'oli-contact-form' ); ?></p>
-				</td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-mail-2-reply-to"><?php esc_html_e( 'Reply-To', 'oli-contact-form' ); ?></label></th>
-				<td><input type="text" name="oli_cf_mail_2[reply_to]" id="oli-cf-mail-2-reply-to" value="<?php echo esc_attr( $mail_2['reply_to'] ); ?>" class="large-text" /></td>
-			</tr>
-			<tr>
-				<th><label for="oli-cf-mail-2-additional-headers"><?php esc_html_e( 'Additional Headers', 'oli-contact-form' ); ?></label></th>
-				<td><textarea name="oli_cf_mail_2[additional_headers]" id="oli-cf-mail-2-additional-headers" rows="3" class="large-text code"><?php echo esc_textarea( $mail_2['additional_headers'] ); ?></textarea></td>
-			</tr>
-		</table>
 		<?php
+	}
+
+	/**
+	 * Print the restore form outside the editor form.
+	 *
+	 * The field meta box is rendered inside form#post. A nested form is discarded
+	 * by the browser, so the button above submits this one through the form attribute.
+	 */
+	public function render_restore_form() {
+		if ( ! $this->is_form_edit_screen() ) {
+			return;
+		}
+
+		$post_id = $this->edited_form_id();
+		$backup  = $post_id ? get_post_meta( $post_id, '_oli_cf_legacy_template', true ) : '';
+
+		if ( ! is_string( $backup ) || '' === $backup ) {
+			return;
+		}
+
+		$action = admin_url( 'admin-post.php' );
+		?>
+		<form id="oli-cf-restore-form" method="post" action="<?php echo esc_url( $action ); ?>" data-oli-confirm="<?php echo esc_attr__( 'Restore the fields and notifications from the saved copy?', 'oli-contact-form' ); ?>">
+			<?php wp_nonce_field( 'oli_cf_restore_form_' . $post_id ); ?>
+			<input type="hidden" name="action" value="oli_cf_restore_form" />
+			<input type="hidden" name="form_id" value="<?php echo esc_attr( (string) absint( $post_id ) ); ?>" />
+		</form>
+		<?php
+	}
+
+	/**
+	 * Whether the current admin screen edits one form.
+	 *
+	 * @return bool
+	 */
+	private function is_form_edit_screen() {
+		if ( ! function_exists( 'get_current_screen' ) ) {
+			return false;
+		}
+
+		$screen = get_current_screen();
+
+		return is_object( $screen )
+			&& isset( $screen->base, $screen->post_type )
+			&& 'post' === $screen->base
+			&& 'oli_contact_form' === $screen->post_type;
+	}
+
+	/**
+	 * Form being edited, when the screen is the form editor.
+	 *
+	 * @return int
+	 */
+	private function edited_form_id() {
+		global $post;
+
+		if ( is_object( $post ) && isset( $post->ID ) ) {
+			return absint( $post->ID );
+		}
+
+		return 0;
 	}
 
 	/**
@@ -196,21 +382,21 @@ class Oli_CF_Meta_Boxes {
 	public function render_messages( $post ) {
 		$messages = Oli_CF_Validator::normalize_messages( get_post_meta( $post->ID, '_oli_cf_messages', true ) );
 		$labels   = array(
-			'mail_sent_ok'          => __( 'Success message', 'oli-contact-form' ),
-			'mail_sent_ng'          => __( 'Mail error message', 'oli-contact-form' ),
-			'validation_error'      => __( 'Validation error (form)', 'oli-contact-form' ),
-			'invalid_required'      => __( 'Required field', 'oli-contact-form' ),
-			'invalid_email'         => __( 'Invalid email', 'oli-contact-form' ),
-			'invalid_tel'           => __( 'Invalid phone', 'oli-contact-form' ),
-			'invalid_url'           => __( 'Invalid URL', 'oli-contact-form' ),
-			'invalid_number'        => __( 'Invalid number', 'oli-contact-form' ),
-			'invalid_date'          => __( 'Invalid date', 'oli-contact-form' ),
-			'invalid_too_long'      => __( 'Too long', 'oli-contact-form' ),
-			'invalid_too_short'     => __( 'Too short', 'oli-contact-form' ),
-			'accept_terms'          => __( 'Acceptance required', 'oli-contact-form' ),
-			'upload_failed'         => __( 'Upload failed', 'oli-contact-form' ),
-			'upload_file_too_large' => __( 'File too large', 'oli-contact-form' ),
-			'upload_file_type'      => __( 'File type not allowed', 'oli-contact-form' ),
+			'success'          => __( 'Success message', 'oli-contact-form' ),
+			'send_error'       => __( 'Send error', 'oli-contact-form' ),
+			'validation_error' => __( 'Validation error', 'oli-contact-form' ),
+			'required'         => __( 'Required field', 'oli-contact-form' ),
+			'email'            => __( 'Invalid email', 'oli-contact-form' ),
+			'phone'            => __( 'Invalid phone', 'oli-contact-form' ),
+			'url'              => __( 'Invalid URL', 'oli-contact-form' ),
+			'number'           => __( 'Invalid number', 'oli-contact-form' ),
+			'date'             => __( 'Invalid date', 'oli-contact-form' ),
+			'too_long'         => __( 'Too long', 'oli-contact-form' ),
+			'too_short'        => __( 'Too short', 'oli-contact-form' ),
+			'acceptance'       => __( 'Acceptance required', 'oli-contact-form' ),
+			'upload_failed'    => __( 'Upload failed', 'oli-contact-form' ),
+			'file_too_large'   => __( 'File too large', 'oli-contact-form' ),
+			'file_type'        => __( 'File type not allowed', 'oli-contact-form' ),
 		);
 		?>
 		<table class="form-table">
@@ -267,84 +453,85 @@ class Oli_CF_Meta_Boxes {
 			return;
 		}
 
-		if ( isset( $_POST['oli_cf_form_template'] ) ) {
-			update_post_meta( $post_id, '_oli_cf_form_template', wp_kses_post( wp_unslash( $_POST['oli_cf_form_template'] ) ) );
+		$use_markup = isset( $_POST['oli_cf_use_markup'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['oli_cf_use_markup'] ) );
+
+		if ( $use_markup && isset( $_POST['oli_cf_fields_markup'] ) ) {
+			$fields = Oli_CF_Fields::from_markup_post( wp_kses_post( wp_unslash( $_POST['oli_cf_fields_markup'] ) ) );
+		} else {
+			$posted = isset( $_POST['oli_cf_fields'] ) ? map_deep( wp_unslash( $_POST['oli_cf_fields'] ), 'wp_kses_post' ) : array();
+			$fields = Oli_CF_Fields::from_builder_post( $posted );
 		}
 
-		// Mail settings keep <[tag]> placeholders that core text sanitizers would strip, so the
-		// unslashed request array goes straight to the dedicated field-by-field sanitizer.
-		$mail = self::read_posted_mail_settings( 'oli_cf_mail', false );
-		if ( null !== $mail ) {
-			update_post_meta( $post_id, '_oli_cf_mail', $mail );
-		}
+		Oli_CF_Fields::save( $post_id, $fields );
+		update_post_meta( $post_id, '_oli_cf_schema', Oli_CF_Fields::SCHEMA );
 
-		$mail_2 = self::read_posted_mail_settings( 'oli_cf_mail_2', true );
-		if ( null !== $mail_2 ) {
-			update_post_meta( $post_id, '_oli_cf_mail_2', $mail_2 );
-		}
+		$posted_notifications = isset( $_POST['oli_cf_notifications'] ) ? map_deep( wp_unslash( $_POST['oli_cf_notifications'] ), 'sanitize_textarea_field' ) : array();
+		$notifications        = Oli_CF_Notifications::from_posted( is_array( $posted_notifications ) ? $posted_notifications : array() );
+		Oli_CF_Notifications::save( $post_id, $notifications );
 
-		if ( isset( $_POST['oli_cf_messages'] ) && is_array( $_POST['oli_cf_messages'] ) ) {
-			$messages = array_map( 'sanitize_text_field', wp_unslash( $_POST['oli_cf_messages'] ) );
-			update_post_meta( $post_id, '_oli_cf_messages', Oli_CF_Validator::normalize_messages( $messages ) );
+		if ( isset( $_POST['oli_cf_messages'] ) ) {
+			$messages = map_deep( wp_unslash( $_POST['oli_cf_messages'] ), 'sanitize_text_field' );
+			update_post_meta( $post_id, '_oli_cf_messages', Oli_CF_Validator::normalize_messages( is_array( $messages ) ? $messages : array() ) );
 		}
 	}
 
 	/**
-	 * Get default form template.
-	 *
-	 * @return string Default template.
+	 * Rebuild one form from the copy saved before the update.
 	 */
-	private function get_default_template() {
-		return '<label> ' . __( 'Your name', 'oli-contact-form' ) . "\n" .
-			'    [text* your-name] </label>' . "\n\n" .
-			'<label> ' . __( 'Your email', 'oli-contact-form' ) . "\n" .
-			'    [email* your-email] </label>' . "\n\n" .
-			'<label> ' . __( 'Subject', 'oli-contact-form' ) . "\n" .
-			'    [text* your-subject] </label>' . "\n\n" .
-			'<label> ' . __( 'Your message', 'oli-contact-form' ) . "\n" .
-			'    [textarea your-message] </label>' . "\n\n" .
-			'[acceptance consent optional "' . __( 'I consent to being contacted about this inquiry.', 'oli-contact-form' ) . '"]' . "\n\n" .
-			'[submit "' . __( 'Send', 'oli-contact-form' ) . '"]';
-	}
+	public function restore_form() {
+		$form_id = isset( $_POST['form_id'] ) ? absint( wp_unslash( $_POST['form_id'] ) ) : 0;
+		$nonce   = isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '';
 
-	/**
-	 * Get default mail settings.
-	 *
-	 * @return array<string, string>
-	 */
-	private function get_default_mail() {
-		return Oli_CF_Mailer::default_mail();
-	}
-
-	/**
-	 * Get default Mail 2 settings.
-	 *
-	 * @return array<string, mixed>
-	 */
-	private function get_default_mail_2() {
-		return Oli_CF_Mailer::default_mail_2();
-	}
-
-	/**
-	 * Read and sanitize one posted mail settings array.
-	 *
-	 * Only called from save_form_data() after the nonce and edit_post checks. filter_input()
-	 * returns the original request values (no WordPress slashes); every field is then
-	 * cleaned by Oli_CF_Mailer::sanitize_mail_settings() before use.
-	 *
-	 * @since 0.3.12
-	 *
-	 * @param string $key       Request key.
-	 * @param bool   $is_mail_2 Whether this is the Mail (2) block.
-	 * @return array<string, mixed>|null Sanitized settings, or null when not posted.
-	 */
-	private static function read_posted_mail_settings( $key, $is_mail_2 ) {
-		$posted = filter_input( INPUT_POST, $key, FILTER_UNSAFE_RAW, FILTER_REQUIRE_ARRAY );
-
-		if ( ! is_array( $posted ) ) {
-			return null;
+		if ( ! $form_id || ! wp_verify_nonce( $nonce, 'oli_cf_restore_form_' . $form_id ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'oli-contact-form' ) );
 		}
 
-		return Oli_CF_Mailer::sanitize_mail_settings( $posted, $is_mail_2 );
+		if ( ! current_user_can( 'edit_post', $form_id ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'oli-contact-form' ) );
+		}
+
+		$restored = Oli_CF_Upgrade::restore_form( $form_id );
+		$link     = function_exists( 'get_edit_post_link' ) ? get_edit_post_link( $form_id, 'raw' ) : '';
+
+		if ( ! is_string( $link ) || '' === $link ) {
+			$link = admin_url( 'post.php?post=' . $form_id . '&action=edit' );
+		}
+
+		$link = add_query_arg(
+			array(
+				'oli_cf_restored'       => $restored ? '1' : '0',
+				'oli_cf_restored_nonce' => wp_create_nonce( 'oli_cf_restored_' . $form_id ),
+			),
+			$link
+		);
+
+		wp_safe_redirect( $link . '#oli-cf-fields' );
+		exit;
+	}
+
+	/**
+	 * Confirm a restore when the editor opens again.
+	 */
+	public function maybe_restore_notice() {
+		if ( ! is_admin() ) {
+			return;
+		}
+
+		$restored = filter_input( INPUT_GET, 'oli_cf_restored', FILTER_SANITIZE_NUMBER_INT );
+		$nonce    = filter_input( INPUT_GET, 'oli_cf_restored_nonce' );
+		$post_id  = absint( filter_input( INPUT_GET, 'post', FILTER_SANITIZE_NUMBER_INT ) );
+		$nonce    = is_string( $nonce ) ? sanitize_text_field( $nonce ) : '';
+
+		if ( '1' !== (string) $restored || ! $post_id || ! wp_verify_nonce( $nonce, 'oli_cf_restored_' . $post_id ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
+		echo '<div class="notice notice-success is-dismissible"><p>';
+		echo esc_html__( 'The original form was restored.', 'oli-contact-form' );
+		echo '</p></div>';
 	}
 }

@@ -8,6 +8,7 @@
 		<testsuite name="oli-contact-form">
 			<file>tests/MailSanitizeTest.php</file>
 			<file>tests/UploadCleanupTest.php</file>
+			<file>tests/FormModelTest.php</file>
 		</testsuite>
 	</testsuites>
 </phpunit>

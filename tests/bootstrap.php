@@ -58,7 +58,15 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
 	 * @return mixed
 	 */
 	function sanitize_text_field( $value ) {
-		return oli_cf_test_sanitize_string( $value );
+		$value = oli_cf_test_sanitize_string( $value );
+
+		if ( ! is_string( $value ) ) {
+			return $value;
+		}
+
+		$value = preg_replace( '/[\r\n\t ]+/', ' ', $value );
+
+		return is_string( $value ) ? trim( $value ) : '';
 	}
 }
 
@@ -114,6 +122,25 @@ if ( ! function_exists( 'sanitize_html_class' ) ) {
 	}
 }
 
+if ( ! function_exists( 'map_deep' ) ) {
+	/**
+	 * @param mixed    $value    Value.
+	 * @param callable $callback Callback.
+	 * @return mixed
+	 */
+	function map_deep( $value, $callback ) {
+		if ( is_array( $value ) ) {
+			foreach ( $value as $index => $item ) {
+				$value[ $index ] = map_deep( $item, $callback );
+			}
+
+			return $value;
+		}
+
+		return call_user_func( $callback, $value );
+	}
+}
+
 if ( ! function_exists( 'wp_unslash' ) ) {
 	/**
 	 * @param mixed $value Value.
@@ -125,6 +152,20 @@ if ( ! function_exists( 'wp_unslash' ) ) {
 		}
 
 		return is_string( $value ) ? stripslashes( $value ) : $value;
+	}
+}
+
+if ( ! function_exists( 'wp_slash' ) ) {
+	/**
+	 * @param mixed $value Value.
+	 * @return mixed
+	 */
+	function wp_slash( $value ) {
+		if ( is_array( $value ) ) {
+			return array_map( 'wp_slash', $value );
+		}
+
+		return is_string( $value ) ? addslashes( $value ) : $value;
 	}
 }
 
@@ -217,6 +258,17 @@ if ( ! function_exists( 'absint' ) ) {
 	 */
 	function absint( $value ) {
 		return abs( (int) $value );
+	}
+}
+
+if ( ! function_exists( 'get_privacy_policy_url' ) ) {
+	/**
+	 * Privacy policy URL for tests. Empty unless a test sets the global.
+	 *
+	 * @return string
+	 */
+	function get_privacy_policy_url() {
+		return isset( $GLOBALS['oli_cf_test_privacy_url'] ) ? (string) $GLOBALS['oli_cf_test_privacy_url'] : '';
 	}
 }
 
@@ -688,6 +740,31 @@ if ( ! function_exists( 'get_post_meta' ) ) {
 	}
 }
 
+if ( ! function_exists( 'update_post_meta' ) ) {
+	/**
+	 * @param int    $id    ID.
+	 * @param string $key   Key.
+	 * @param mixed  $value Value.
+	 * @return bool
+	 */
+	function update_post_meta( $id, $key, $value ) {
+		$GLOBALS['oli_cf_test_meta'][ (int) $id ][ (string) $key ] = wp_unslash( $value );
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_post_meta' ) ) {
+	/**
+	 * @param int    $id  ID.
+	 * @param string $key Key.
+	 * @return bool
+	 */
+	function delete_post_meta( $id, $key ) {
+		unset( $GLOBALS['oli_cf_test_meta'][ (int) $id ][ (string) $key ] );
+		return true;
+	}
+}
+
 if ( ! function_exists( 'wp_mail' ) ) {
 	/**
 	 * @param string|string[] $to          To.
@@ -956,11 +1033,16 @@ function oli_cf_assert_false( $actual, $label ) {
 }
 
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-form-parser.php';
+require_once dirname( __DIR__ ) . '/includes/class-oli-cf-json-meta.php';
+require_once dirname( __DIR__ ) . '/includes/class-oli-cf-fields.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-uploads.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-validator.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-mailer.php';
+require_once dirname( __DIR__ ) . '/includes/class-oli-cf-notifications.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-anti-spam.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-submission.php';
+require_once dirname( __DIR__ ) . '/includes/import/class-oli-cf-import-registry.php';
+require_once dirname( __DIR__ ) . '/includes/class-oli-cf-upgrade.php';
 require_once dirname( __DIR__ ) . '/admin/class-oli-cf-importer.php';
 require_once dirname( __DIR__ ) . '/admin/class-oli-cf-settings.php';
 require_once dirname( __DIR__ ) . '/public/class-oli-cf-public.php';

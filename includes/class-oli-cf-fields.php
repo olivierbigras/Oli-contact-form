@@ -1,0 +1,903 @@
+<?php
+/**
+ * Canonical form fields.
+ *
+ * Forms are a list of fields (type, name, label, required, options), stored as
+ * JSON in post meta. A text form uses attributes, for example
+ * {{field type="email" name="email" label="Email" required}}.
+ *
+ * @package Oli_Contact_Form
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Field schema, text form, and conversion from the previous template storage.
+ */
+class Oli_CF_Fields {
+
+	/**
+	 * Post meta key for the JSON field list.
+	 *
+	 * @var string
+	 */
+	const META = '_oli_cf_fields';
+
+	/**
+	 * Schema version stored on each form after conversion.
+	 *
+	 * @var string
+	 */
+	const SCHEMA = '2';
+
+	/**
+	 * Field types this plugin renders.
+	 *
+	 * @return string[]
+	 */
+	public static function types() {
+		return array_keys( self::type_labels() );
+	}
+
+	/**
+	 * Visible names for the field types.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function type_labels() {
+		return array(
+			'text'       => __( 'Text', 'oli-contact-form' ),
+			'email'      => __( 'Email', 'oli-contact-form' ),
+			'tel'        => __( 'Phone', 'oli-contact-form' ),
+			'url'        => __( 'URL', 'oli-contact-form' ),
+			'number'     => __( 'Number', 'oli-contact-form' ),
+			'date'       => __( 'Date', 'oli-contact-form' ),
+			'textarea'   => __( 'Paragraph', 'oli-contact-form' ),
+			'select'     => __( 'Dropdown', 'oli-contact-form' ),
+			'radio'      => __( 'Radio buttons', 'oli-contact-form' ),
+			'checkbox'   => __( 'Checkboxes', 'oli-contact-form' ),
+			'acceptance' => __( 'Acceptance', 'oli-contact-form' ),
+			'file'       => __( 'File', 'oli-contact-form' ),
+			'hidden'     => __( 'Hidden', 'oli-contact-form' ),
+			'submit'     => __( 'Submit', 'oli-contact-form' ),
+		);
+	}
+
+	/**
+	 * Visible name of one field type.
+	 *
+	 * @param string $type Type identifier.
+	 * @return string
+	 */
+	public static function type_label( $type ) {
+		$labels = self::type_labels();
+		$type   = self::normalize_type( $type );
+
+		return isset( $labels[ $type ] ) ? $labels[ $type ] : $type;
+	}
+
+	/**
+	 * Empty field.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function blank() {
+		return array(
+			'type'        => 'text',
+			'name'        => '',
+			'label'       => '',
+			'required'    => false,
+			'placeholder' => '',
+			'options'     => array(),
+			'default'     => '',
+			'maxlength'   => '',
+			'minlength'   => '',
+			'limit'       => '',
+			'filetypes'   => '',
+		);
+	}
+
+	/**
+	 * Build one sanitized field.
+	 *
+	 * @param string               $type     Field type.
+	 * @param string               $name     Machine name.
+	 * @param string               $label    Visible label.
+	 * @param bool                 $required Whether the field is required.
+	 * @param array<string, mixed> $args     Optional properties.
+	 * @return array<string, mixed>
+	 */
+	public static function make( $type, $name, $label, $required = false, $args = array() ) {
+		$field             = self::blank();
+		$field['type']     = self::normalize_type( $type );
+		$field['name']     = self::sanitize_name( $name );
+		$field['label']    = self::sanitize_label( $label );
+		$field['required'] = (bool) $required;
+
+		if ( ! is_array( $args ) ) {
+			$args = array();
+		}
+
+		foreach ( array( 'placeholder', 'default', 'maxlength', 'minlength', 'limit', 'filetypes' ) as $key ) {
+			if ( isset( $args[ $key ] ) ) {
+				$field[ $key ] = self::sanitize_label( $args[ $key ] );
+			}
+		}
+
+		if ( isset( $args['options'] ) && is_array( $args['options'] ) ) {
+			$field['options'] = self::sanitize_options( $args['options'] );
+		}
+
+		if ( 'submit' === $field['type'] && '' === $field['name'] ) {
+			$field['name'] = 'submit';
+		}
+
+		if ( 'acceptance' === $field['type'] && '' === $field['label'] && ! empty( $field['options'] ) ) {
+			$field['label']   = $field['options'][0];
+			$field['options'] = array();
+		}
+
+		return $field;
+	}
+
+	/**
+	 * Default fields for a new form.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function defaults() {
+		return array(
+			self::make( 'text', 'name', __( 'Your name', 'oli-contact-form' ), true ),
+			self::make( 'email', 'email', __( 'Your email', 'oli-contact-form' ), true ),
+			self::make( 'text', 'subject', __( 'Subject', 'oli-contact-form' ), true ),
+			self::make( 'textarea', 'message', __( 'Your message', 'oli-contact-form' ), false ),
+			self::make( 'acceptance', 'consent', self::default_consent_label(), true ),
+			self::make( 'submit', 'submit', __( 'Send', 'oli-contact-form' ), false ),
+		);
+	}
+
+	/**
+	 * Whether a string is the text form rather than an older template.
+	 *
+	 * @param string $text Text.
+	 * @return bool
+	 */
+	public static function is_markup( $text ) {
+		return is_string( $text ) && false !== strpos( $text, '{{field' );
+	}
+
+	/**
+	 * Fields saved on a form, or a conversion of the previous template.
+	 *
+	 * @param int $form_id Form ID.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function for_form( $form_id ) {
+		$stored = get_post_meta( (int) $form_id, self::META, true );
+
+		if ( self::is_stored( $stored ) ) {
+			return self::decode( $stored );
+		}
+
+		$legacy = get_post_meta( (int) $form_id, '_oli_cf_legacy_template', true );
+
+		if ( ! is_string( $legacy ) || '' === trim( $legacy ) ) {
+			$legacy = get_post_meta( (int) $form_id, '_oli_cf_form_template', true );
+		}
+
+		if ( is_string( $legacy ) && '' !== trim( $legacy ) ) {
+			$report = self::legacy_report( $legacy );
+
+			return $report['fields'];
+		}
+
+		return array();
+	}
+
+	/**
+	 * Decode stored JSON or an array into a field list.
+	 *
+	 * @param mixed $stored Stored value.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function decode( $stored ) {
+		if ( is_string( $stored ) && '' !== $stored ) {
+			$decoded = json_decode( $stored, true );
+			$stored  = is_array( $decoded ) ? $decoded : array();
+		}
+
+		if ( ! is_array( $stored ) ) {
+			return array();
+		}
+
+		return self::normalize_list( $stored );
+	}
+
+	/**
+	 * Whether meta contains an explicit field list, including an empty list.
+	 *
+	 * @param mixed $stored Stored value.
+	 * @return bool
+	 */
+	public static function is_stored( $stored ) {
+		if ( is_array( $stored ) ) {
+			return true;
+		}
+
+		return is_string( $stored ) && '' !== $stored;
+	}
+
+	/**
+	 * JSON for post meta.
+	 *
+	 * @param array<int, array<string, mixed>> $fields Fields.
+	 * @return string
+	 */
+	public static function encode( $fields ) {
+		$json = wp_json_encode( self::normalize_list( $fields ) );
+
+		return is_string( $json ) ? $json : '[]';
+	}
+
+	/**
+	 * Read the JSON stored for one form.
+	 *
+	 * @param int $post_id Form ID.
+	 * @return string
+	 */
+	public static function read( $post_id ) {
+		return Oli_CF_Json_Meta::read( $post_id, self::META );
+	}
+
+	/**
+	 * Write the field list. The JSON is slashed because post meta unslashes on save.
+	 *
+	 * @param int                              $post_id Form ID.
+	 * @param array<int, array<string, mixed>> $fields  Fields.
+	 */
+	public static function save( $post_id, $fields ) {
+		Oli_CF_Json_Meta::write( $post_id, self::META, self::encode( $fields ) );
+	}
+
+	/**
+	 * Normalize a list of field arrays.
+	 *
+	 * @param array<int, mixed> $fields Raw fields.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function normalize_list( $fields ) {
+		$clean = array();
+		$used  = array();
+
+		if ( ! is_array( $fields ) ) {
+			return $clean;
+		}
+
+		foreach ( $fields as $field ) {
+			if ( ! is_array( $field ) ) {
+				continue;
+			}
+
+			$made = self::make(
+				isset( $field['type'] ) ? $field['type'] : 'text',
+				isset( $field['name'] ) ? $field['name'] : '',
+				isset( $field['label'] ) ? $field['label'] : '',
+				! empty( $field['required'] ),
+				$field
+			);
+
+			if ( '' === $made['name'] || ! in_array( $made['type'], self::types(), true ) ) {
+				continue;
+			}
+
+			$made['name'] = self::unique_name( $made['name'], $made['name'], $used );
+			$clean[]      = $made;
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Parse the text form into fields.
+	 *
+	 * @param string $markup Markup.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function from_markup( $markup ) {
+		$fields = array();
+
+		if ( ! is_string( $markup ) || ! preg_match_all( '/\{\{field\b(.*?)\}\}/s', $markup, $matches ) ) {
+			return $fields;
+		}
+
+		foreach ( $matches[1] as $raw ) {
+			$attrs    = self::parse_markup_attributes( $raw );
+			$type     = isset( $attrs['type'] ) ? $attrs['type'] : 'text';
+			$name     = isset( $attrs['name'] ) ? $attrs['name'] : '';
+			$label    = isset( $attrs['label'] ) ? self::unescape_markup_attribute( $attrs['label'] ) : '';
+			$required = isset( $attrs['required'] );
+
+			if ( isset( $attrs['optional'] ) ) {
+				$required = false;
+			} elseif ( 'acceptance' === self::normalize_type( $type ) && ! isset( $attrs['required'] ) ) {
+				$required = true;
+			}
+
+			$options = array();
+
+			if ( ! empty( $attrs['options'] ) ) {
+				$options = preg_split( '/\|/', (string) $attrs['options'] );
+				$options = is_array( $options ) ? $options : array();
+			}
+
+			$fields[] = self::make(
+				$type,
+				'' !== $name ? $name : $label,
+				$label,
+				$required,
+				array(
+					'placeholder' => isset( $attrs['placeholder'] ) ? $attrs['placeholder'] : '',
+					'default'     => isset( $attrs['default'] ) ? $attrs['default'] : '',
+					'maxlength'   => isset( $attrs['maxlength'] ) ? $attrs['maxlength'] : '',
+					'minlength'   => isset( $attrs['minlength'] ) ? $attrs['minlength'] : '',
+					'limit'       => isset( $attrs['limit'] ) ? $attrs['limit'] : '',
+					'filetypes'   => isset( $attrs['filetypes'] ) ? $attrs['filetypes'] : '',
+					'options'     => $options,
+				)
+			);
+		}
+
+		return self::normalize_list( $fields );
+	}
+
+	/**
+	 * Text form for a field list.
+	 *
+	 * @param array<int, array<string, mixed>> $fields Fields.
+	 * @return string
+	 */
+	public static function to_markup( $fields ) {
+		$lines = array();
+
+		foreach ( self::normalize_list( $fields ) as $field ) {
+			$parts   = array();
+			$parts[] = 'type="' . $field['type'] . '"';
+			$parts[] = 'name="' . $field['name'] . '"';
+
+			if ( '' !== $field['label'] ) {
+				$parts[] = 'label="' . self::escape_markup_attribute( $field['label'] ) . '"';
+			}
+
+			if ( 'acceptance' === $field['type'] ) {
+				$parts[] = ! empty( $field['required'] ) ? 'required' : 'optional';
+			} elseif ( ! empty( $field['required'] ) ) {
+				$parts[] = 'required';
+			}
+
+			foreach ( array( 'placeholder', 'default', 'maxlength', 'minlength', 'limit', 'filetypes' ) as $key ) {
+				if ( '' !== (string) $field[ $key ] ) {
+					$parts[] = $key . '="' . str_replace( '"', '', (string) $field[ $key ] ) . '"';
+				}
+			}
+
+			if ( ! empty( $field['options'] ) ) {
+				$parts[] = 'options="' . str_replace( '"', '', implode( '|', $field['options'] ) ) . '"';
+			}
+
+			$lines[] = '{{field ' . implode( ' ', $parts ) . '}}';
+		}
+
+		return implode( "\n", $lines );
+	}
+
+	/**
+	 * Convert a template saved by a previous version.
+	 *
+	 * @param string $template Previous template.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function from_legacy_template( $template ) {
+		$report = self::legacy_report( $template );
+
+		return $report['fields'];
+	}
+
+	/**
+	 * Convert a previous template and list tags this plugin does not render.
+	 *
+	 * @param string $template Previous template.
+	 * @return array{fields: array<int, array<string, mixed>>, unsupported: array<int, array<string, string>>}
+	 */
+	public static function legacy_report( $template ) {
+		$template    = Oli_CF_Form_Parser::normalize_template( $template );
+		$labels      = Oli_CF_Form_Parser::field_labels( $template );
+		$parsed      = Oli_CF_Form_Parser::parse_fields( $template );
+		$fields      = array();
+		$unsupported = array();
+
+		foreach ( $parsed as $field ) {
+			$type = isset( $field['type'] ) ? self::normalize_type( $field['type'] ) : '';
+			$name = isset( $field['name'] ) ? (string) $field['name'] : '';
+
+			if ( ( '' === $type || 'submit' === $type ) && '' === $name ) {
+				$name = 'submit';
+			}
+
+			$label = isset( $labels[ $name ] ) ? $labels[ $name ] : '';
+
+			if ( '' === $label && 'acceptance' === $type && ! empty( $field['values'] ) && is_array( $field['values'] ) ) {
+				$label = implode( ' ', $field['values'] );
+			}
+
+			if ( '' === $label && 'submit' === $type && ! empty( $field['values'][0] ) ) {
+				$label = (string) $field['values'][0];
+			}
+
+			if ( ! in_array( $type, self::types(), true ) ) {
+				$unsupported[] = array(
+					'type'  => $type,
+					'label' => '' !== $label ? $label : $name,
+				);
+				continue;
+			}
+
+			$attrs   = isset( $field['attributes'] ) && is_array( $field['attributes'] ) ? $field['attributes'] : array();
+			$options = array();
+
+			if ( in_array( $type, array( 'select', 'radio', 'checkbox' ), true ) && ! empty( $field['values'] ) && is_array( $field['values'] ) ) {
+				$options = $field['values'];
+			}
+
+			$fields[] = self::make(
+				$type,
+				$name,
+				$label,
+				! empty( $field['required'] ),
+				array(
+					'placeholder' => isset( $attrs['placeholder'] ) ? $attrs['placeholder'] : '',
+					'default'     => isset( $attrs['default'] ) ? $attrs['default'] : '',
+					'maxlength'   => isset( $attrs['maxlength'] ) ? $attrs['maxlength'] : '',
+					'minlength'   => isset( $attrs['minlength'] ) ? $attrs['minlength'] : '',
+					'limit'       => isset( $attrs['limit'] ) ? $attrs['limit'] : '',
+					'filetypes'   => isset( $attrs['filetypes'] ) ? $attrs['filetypes'] : '',
+					'options'     => $options,
+				)
+			);
+		}
+
+		return array(
+			'fields'      => self::normalize_list( $fields ),
+			'unsupported' => $unsupported,
+		);
+	}
+
+	/**
+	 * Shape used by the HTML renderer.
+	 *
+	 * @param array<int, array<string, mixed>> $fields Fields.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function to_parser_fields( $fields ) {
+		$parser = array();
+
+		foreach ( self::normalize_list( $fields ) as $field ) {
+			$attrs = array();
+
+			foreach ( array( 'placeholder', 'default', 'maxlength', 'minlength', 'limit', 'filetypes' ) as $key ) {
+				if ( '' !== (string) $field[ $key ] ) {
+					$attrs[ $key ] = (string) $field[ $key ];
+				}
+			}
+
+			$values = $field['options'];
+
+			if ( 'acceptance' === $field['type'] && '' !== $field['label'] ) {
+				$values = array( $field['label'] );
+			}
+
+			if ( 'submit' === $field['type'] ) {
+				$values = array( '' !== $field['label'] ? $field['label'] : __( 'Send', 'oli-contact-form' ) );
+			}
+
+			$parser[] = array(
+				'type'       => $field['type'],
+				'name'       => $field['name'],
+				'required'   => ! empty( $field['required'] ),
+				'attributes' => $attrs,
+				'values'     => $values,
+				'label'      => $field['label'],
+			);
+		}
+
+		return $parser;
+	}
+
+	/**
+	 * Labels keyed by field name.
+	 *
+	 * @param array<int, array<string, mixed>> $fields Fields.
+	 * @return array<string, string>
+	 */
+	public static function label_map( $fields ) {
+		$map = array();
+
+		foreach ( self::normalize_list( $fields ) as $field ) {
+			if ( '' === $field['name'] || 'submit' === $field['type'] ) {
+				continue;
+			}
+
+			if ( '' !== $field['label'] ) {
+				$map[ $field['name'] ] = $field['label'];
+				continue;
+			}
+
+			$map[ $field['name'] ] = Oli_CF_Form_Parser::humanize_field_name( $field['name'] );
+		}
+
+		return $map;
+	}
+
+	/**
+	 * Whether any field is required.
+	 *
+	 * @param array<int, array<string, mixed>> $fields Fields.
+	 * @return bool
+	 */
+	public static function has_required( $fields ) {
+		foreach ( self::normalize_list( $fields ) as $field ) {
+			if ( ! empty( $field['required'] ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Fields posted by the editor.
+	 *
+	 * Labels are not passed through sanitize_textarea_field() or wp_kses_post().
+	 * sanitize_label() keeps one simple http(s) link and drops anything else.
+	 *
+	 * @param mixed $posted Posted rows, already unslashed.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function from_builder_post( $posted ) {
+		if ( ! is_array( $posted ) ) {
+			return array();
+		}
+
+		return self::from_posted( self::sanitize_builder_input( $posted ) );
+	}
+
+	/**
+	 * Text form posted by the editor.
+	 *
+	 * The label is decoded and passed to sanitize_label(). It is not run through
+	 * wp_kses_post() first, because that rewrites a rejected URL before the scheme check.
+	 *
+	 * @param mixed $markup Posted markup, already unslashed.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function from_markup_post( $markup ) {
+		return self::from_markup( (string) $markup );
+	}
+
+	/**
+	 * Sanitize builder rows without stripping a label's privacy link.
+	 *
+	 * @param mixed $posted Posted rows.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function sanitize_builder_input( $posted ) {
+		if ( ! is_array( $posted ) ) {
+			return array();
+		}
+
+		$clean = array();
+
+		foreach ( $posted as $index => $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$clean[ $index ] = array();
+
+			foreach ( $row as $key => $value ) {
+				if ( is_array( $value ) ) {
+					$clean[ $index ][ $key ] = $value;
+					continue;
+				}
+
+				$value = (string) $value;
+
+				if ( 'label' === (string) $key ) {
+					$clean[ $index ][ $key ] = $value;
+					continue;
+				}
+
+				$clean[ $index ][ $key ] = sanitize_textarea_field( $value );
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Sanitize a posted field builder.
+	 *
+	 * @param mixed $posted Posted rows.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function from_posted( $posted ) {
+		if ( ! is_array( $posted ) ) {
+			return array();
+		}
+
+		$rows = array();
+
+		foreach ( $posted as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$options = array();
+
+			if ( isset( $row['options'] ) ) {
+				$split   = preg_split( '/\r\n|\r|\n/', (string) $row['options'] );
+				$options = is_array( $split ) ? $split : array();
+			}
+
+			$rows[] = self::make(
+				isset( $row['type'] ) ? $row['type'] : 'text',
+				isset( $row['name'] ) ? $row['name'] : '',
+				isset( $row['label'] ) ? $row['label'] : '',
+				! empty( $row['required'] ),
+				array(
+					'placeholder' => isset( $row['placeholder'] ) ? $row['placeholder'] : '',
+					'default'     => isset( $row['default'] ) ? $row['default'] : '',
+					'maxlength'   => isset( $row['maxlength'] ) ? $row['maxlength'] : '',
+					'minlength'   => isset( $row['minlength'] ) ? $row['minlength'] : '',
+					'limit'       => isset( $row['limit'] ) ? $row['limit'] : '',
+					'filetypes'   => isset( $row['filetypes'] ) ? $row['filetypes'] : '',
+					'options'     => $options,
+				)
+			);
+		}
+
+		return self::normalize_list( $rows );
+	}
+
+	/**
+	 * A machine name that does not collide with names already used.
+	 *
+	 * @param string             $label    Preferred label or name.
+	 * @param string             $fallback Fallback name.
+	 * @param array<string,bool> $used     Names already taken.
+	 * @return string
+	 */
+	public static function unique_name( $label, $fallback, &$used ) {
+		$name = self::sanitize_name( $label );
+
+		if ( '' === $name ) {
+			$name = self::sanitize_name( $fallback );
+		}
+
+		if ( '' === $name ) {
+			$name = 'field';
+		}
+
+		$base = $name;
+		$i    = 2;
+
+		while ( isset( $used[ $name ] ) ) {
+			$name = $base . '-' . $i;
+			++$i;
+		}
+
+		$used[ $name ] = true;
+
+		return $name;
+	}
+
+	/**
+	 * Normalize a type alias.
+	 *
+	 * @param string $type Raw type.
+	 * @return string
+	 */
+	public static function normalize_type( $type ) {
+		$type = strtolower( trim( (string) $type ) );
+
+		if ( 'phone' === $type ) {
+			return 'tel';
+		}
+
+		return $type;
+	}
+
+	/**
+	 * Sanitize a field machine name.
+	 *
+	 * @param string $name Raw name.
+	 * @return string
+	 */
+	public static function sanitize_name( $name ) {
+		$name = strtolower( trim( (string) $name ) );
+		$name = preg_replace( '/[^a-z0-9_-]+/', '-', $name );
+		$name = trim( (string) $name, '-' );
+
+		if ( strlen( $name ) > 60 ) {
+			$name = rtrim( substr( $name, 0, 60 ), '-' );
+		}
+
+		return $name;
+	}
+
+	/**
+	 * Consent sentence for a new form, with the privacy policy when the site has one.
+	 *
+	 * @return string
+	 */
+	public static function default_consent_label() {
+		$plain = __( 'I consent to being contacted about this inquiry.', 'oli-contact-form' );
+		$url   = function_exists( 'get_privacy_policy_url' ) ? get_privacy_policy_url() : '';
+
+		if ( ! is_string( $url ) || '' === $url ) {
+			return $plain;
+		}
+
+		return sprintf(
+			/* translators: 1: opening link tag for the privacy policy, 2: closing link tag. */
+			__( 'I consent to being contacted about this inquiry and agree to the %1$sprivacy policy%2$s.', 'oli-contact-form' ),
+			'<a href="' . esc_url( $url ) . '">',
+			'</a>'
+		);
+	}
+
+	/**
+	 * Anchors kept while a label is cleaned. The key is a placeholder token.
+	 *
+	 * @var array<string, string>
+	 */
+	private static $label_links = array();
+
+	/**
+	 * Sanitize a single line of human text.
+	 *
+	 * A privacy-policy link is kept. Every other tag, and quotes outside that link, are removed.
+	 *
+	 * @param mixed $text Raw text.
+	 * @return string
+	 */
+	public static function sanitize_label( $text ) {
+		self::$label_links = array();
+		$text              = str_replace( array( "\0", '[', ']', '{', '}' ), '', (string) $text );
+		$text              = preg_replace_callback(
+			'/<a\s+href=(["\'])([^"\']+)\1[^>]*>([^<]*)<\/a>/i',
+			array( __CLASS__, 'capture_label_link' ),
+			$text
+		);
+		$text              = str_replace( '"', '', (string) $text );
+		$text              = wp_strip_all_tags( $text );
+		$text              = trim( (string) preg_replace( '/\s+/', ' ', (string) $text ) );
+
+		if ( self::$label_links ) {
+			$text              = strtr( $text, self::$label_links );
+			self::$label_links = array();
+		}
+
+		return $text;
+	}
+
+	/**
+	 * Replace one allowed anchor with a token until the rest of the label is cleaned.
+	 *
+	 * @param array<int, string> $matches Regex matches.
+	 * @return string
+	 */
+	private static function capture_label_link( $matches ) {
+		$raw = trim( (string) $matches[2] );
+
+		// Judge the address that was written, not the one esc_url() would invent.
+		// wp_kses_post() can turn javascript:alert(1) into alert(1), and esc_url()
+		// then turns that into http://alert(1).
+		if ( 1 !== preg_match( '#\Ahttps?://#i', $raw ) ) {
+			return wp_strip_all_tags( $matches[3] );
+		}
+
+		$href = esc_url( $raw );
+
+		if ( ! is_string( $href ) || 1 !== preg_match( '#\Ahttps?://#i', $href ) ) {
+			return wp_strip_all_tags( $matches[3] );
+		}
+
+		$inner                       = str_replace( array( '"', '[', ']', '{', '}' ), '', wp_strip_all_tags( $matches[3] ) );
+		$token                       = '%%OLI_CF_ANCHOR_' . count( self::$label_links ) . '%%';
+		self::$label_links[ $token ] = '<a href="' . $href . '">' . trim( $inner ) . '</a>';
+
+		return $token;
+	}
+
+	/**
+	 * Sanitize choice labels.
+	 *
+	 * @param array<int, mixed> $options Raw options.
+	 * @return string[]
+	 */
+	private static function sanitize_options( $options ) {
+		$clean = array();
+
+		foreach ( $options as $option ) {
+			$option = self::sanitize_label( $option );
+
+			if ( '' !== $option ) {
+				$clean[] = $option;
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Encode a label so it can sit inside a double-quoted markup attribute.
+	 *
+	 * @param string $value Label.
+	 * @return string
+	 */
+	private static function escape_markup_attribute( $value ) {
+		return str_replace(
+			array( '&', '"', '<', '>' ),
+			array( '&amp;', '&quot;', '&lt;', '&gt;' ),
+			(string) $value
+		);
+	}
+
+	/**
+	 * Reverse escape_markup_attribute().
+	 *
+	 * @param string $value Attribute value.
+	 * @return string
+	 */
+	private static function unescape_markup_attribute( $value ) {
+		return html_entity_decode( (string) $value, ENT_QUOTES, 'UTF-8' );
+	}
+
+	/**
+	 * Read attributes from the inside of a field tag.
+	 *
+	 * @param string $raw Attribute text.
+	 * @return array<string, string>
+	 */
+	private static function parse_markup_attributes( $raw ) {
+		$attrs = array();
+
+		if ( preg_match_all( '/([a-zA-Z0-9_-]+)\s*=\s*"([^"]*)"/', (string) $raw, $pairs, PREG_SET_ORDER ) ) {
+			foreach ( $pairs as $pair ) {
+				$attrs[ strtolower( $pair[1] ) ] = $pair[2];
+			}
+		}
+
+		if ( preg_match_all( '/([a-zA-Z0-9_-]+)\s*=\s*\'([^\']*)\'/', (string) $raw, $pairs, PREG_SET_ORDER ) ) {
+			foreach ( $pairs as $pair ) {
+				$attrs[ strtolower( $pair[1] ) ] = $pair[2];
+			}
+		}
+
+		$bare = preg_replace( '/([a-zA-Z0-9_-]+)\s*=\s*("[^"]*"|\'[^\']*\')/', ' ', (string) $raw );
+
+		if ( is_string( $bare ) && preg_match_all( '/(?:^|\s)([a-zA-Z0-9_-]+)(?=\s|$)/', $bare, $flags ) ) {
+			foreach ( $flags[1] as $flag ) {
+				$key = strtolower( $flag );
+
+				if ( ! isset( $attrs[ $key ] ) ) {
+					$attrs[ $key ] = '1';
+				}
+			}
+		}
+
+		return $attrs;
+	}
+}

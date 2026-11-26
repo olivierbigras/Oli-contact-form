@@ -43,9 +43,16 @@ class Oli_CF {
 		$this->plugin_name = 'oli-contact-form';
 
 		$this->load_dependencies();
-		Oli_CF_Uploads::maybe_upgrade();
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
+		$this->loader->add_action( 'init', $this, 'upgrade', 1 );
+	}
+
+	/**
+	 * Convert stored forms after translations can load.
+	 */
+	public function upgrade() {
+		Oli_CF_Upgrade::maybe_upgrade();
 	}
 
 	/**
@@ -55,11 +62,16 @@ class Oli_CF {
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-loader.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-post-type.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-form-parser.php';
+		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-json-meta.php';
+		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-fields.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-uploads.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-validator.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-mailer.php';
+		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-notifications.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-submission.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-anti-spam.php';
+		require_once OLI_CF_PLUGIN_DIR . 'includes/import/class-oli-cf-import-registry.php';
+		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-upgrade.php';
 
 		require_once OLI_CF_PLUGIN_DIR . 'admin/class-oli-cf-admin.php';
 		require_once OLI_CF_PLUGIN_DIR . 'admin/class-oli-cf-meta-boxes.php';
@@ -82,8 +94,11 @@ class Oli_CF {
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
 		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_import_notice' );
+		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_migration_notice' );
 		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_staging_notice' );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'maybe_dismiss_staging_notice' );
+		$this->loader->add_action( 'admin_init', $plugin_admin, 'maybe_dismiss_migration_notice' );
+		$this->loader->add_action( 'wp_ajax_oli_cf_dismiss_migration', $plugin_admin, 'ajax_dismiss_migration' );
 
 		$post_type = new Oli_CF_Post_Type();
 		$this->loader->add_action( 'init', $post_type, 'register_post_type' );
@@ -91,6 +106,8 @@ class Oli_CF {
 		$meta_boxes = new Oli_CF_Meta_Boxes();
 		$this->loader->add_action( 'add_meta_boxes', $meta_boxes, 'add_meta_boxes' );
 		$this->loader->add_action( 'save_post_oli_contact_form', $meta_boxes, 'save_form_data', 10, 2 );
+		$this->loader->add_action( 'admin_notices', $meta_boxes, 'maybe_restore_notice' );
+		$this->loader->add_action( 'admin_footer', $meta_boxes, 'render_restore_form' );
 
 		$settings = new Oli_CF_Settings();
 		$this->loader->add_action( 'admin_menu', $settings, 'add_settings_page' );
@@ -98,8 +115,17 @@ class Oli_CF {
 
 		$importer = new Oli_CF_Importer();
 		$this->loader->add_action( 'admin_menu', $importer, 'add_importer_page' );
+		$this->loader->add_action( 'admin_init', $importer, 'redirect_legacy_page' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $importer, 'enqueue_scripts' );
-		$this->loader->add_action( 'admin_post_oli_cf_import_cf7', $importer, 'handle_import' );
+		$this->loader->add_action( 'admin_post_oli_cf_import_preview', $importer, 'handle_preview' );
+		$this->loader->add_action( 'admin_post_oli_cf_import_run', $importer, 'handle_run' );
+		$this->loader->add_action( 'admin_post_oli_cf_restore_form', $meta_boxes, 'restore_form' );
+
+		$legacy_action = Oli_CF_Import_Registry::legacy_admin_action();
+
+		if ( '' !== $legacy_action ) {
+			$this->loader->add_action( 'admin_post_' . $legacy_action, $importer, 'handle_legacy_action' );
+		}
 	}
 
 	/**

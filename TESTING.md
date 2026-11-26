@@ -1,4 +1,4 @@
-# Testing Guide for Oli Contact Form v0.3.5
+# Testing Guide for Oli Contact Form v0.4.0
 
 ## CLI tests
 
@@ -6,7 +6,7 @@
 php tests/run.php
 ```
 
-Covers validation (including minlength/maxlength), mail building and CF7 special mail-tags, reCAPTCHA v2/v3 (version setting, score rules), upload deletion, CF7 import (file + acceptance required-unless-optional), AJAX `self`/banner/spinner reset, no-JS validation vs mail_failed transients, status-banner redirect hash, field-border specificity, required-field marks, and partial `_oli_cf_mail` meta.
+Covers validation (including minlength/maxlength), mail tokens, reCAPTCHA v2/v3 (version setting, score rules), upload deletion, form import (file fields and acceptance required unless marked optional), field markup, notification conditions, migration of stored forms, AJAX `self`/banner/spinner reset, no-JS validation vs mail_failed transients, status-banner redirect hash, field-border specificity, and required-field marks.
 
 ## Manual checks
 
@@ -15,9 +15,9 @@ Covers validation (including minlength/maxlength), mail building and CF7 special
 3. Embed with `[oli_contact_form id="…"]` and with the Oli Contact Form block.
 4. Submit with JavaScript on (AJAX) and off (redirect + status nonce).
 5. Confirm required/invalid messages are editable on the form editor.
-6. Confirm the admin email and optional Mail 2 confirmation replace `[field]` tags.
+6. Confirm the admin notification and the optional sender confirmation replace `{field:name}` tokens.
 7. Upload a file, confirm it arrives as an attachment, and confirm it is not left in uploads or temp.
-8. Import a Contact Form 7 form and compare tags plus mail settings.
+8. Import an existing form, review unsupported fields, and confirm the draft uses the field builder.
 9. Enable Turnstile or reCAPTCHA and confirm the script loads only on pages that contain a form.
 
 ## PHPCS
