@@ -5,6 +5,12 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-11-26
+
+### Corrigé
+- Un lien relatif à la racine du site dans un libellé (`/privacy-policy/`) est enregistré comme URL absolue avec `home_url()`. Tout autre lien qui n'est pas une URL http ou https complète est retiré, et l'écran d'administration suivant affiche un avertissement qui nomme le libellé.
+- Le libellé d'un champ est une zone de texte large qui grandit avec le contenu, pour qu'un libellé long (lien vers la politique de confidentialité compris) reste visible.
+
 ## [0.4.0] - 2026-11-26
 
 ### Ajouté

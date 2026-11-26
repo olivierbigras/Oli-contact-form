@@ -130,15 +130,17 @@ class Oli_CF_Meta_Boxes {
 					<?php esc_html_e( 'Name', 'oli-contact-form' ); ?>
 					<input type="text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][name]" value="<?php echo esc_attr( $field['name'] ); ?>" />
 				</label>
-				<label>
-					<?php esc_html_e( 'Label', 'oli-contact-form' ); ?>
-					<input type="text" class="regular-text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][label]" value="<?php echo esc_attr( $field['label'] ); ?>" />
-				</label>
 				<label class="oli-cf-required-option">
 					<input type="checkbox" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][required]" value="1" <?php checked( ! empty( $field['required'] ) ); ?> />
 					<?php esc_html_e( 'Required', 'oli-contact-form' ); ?>
 				</label>
 				<button type="button" class="button-link oli-cf-remove-row"><?php esc_html_e( 'Remove', 'oli-contact-form' ); ?></button>
+			</p>
+			<p>
+				<label class="oli-cf-field-label">
+					<?php esc_html_e( 'Label', 'oli-contact-form' ); ?>
+					<textarea class="large-text oli-cf-label-input" rows="2" cols="40" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][label]"><?php echo esc_textarea( $field['label'] ); ?></textarea>
+				</label>
 			</p>
 			<p>
 				<label class="oli-cf-placeholder-options">

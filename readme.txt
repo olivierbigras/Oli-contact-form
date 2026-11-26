@@ -4,7 +4,7 @@ Tags: contact form, form, email, ajax, contact
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.4.0
+Stable tag: 0.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -132,6 +132,10 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 7. Validation errors: required field and invalid email address
 
 == Changelog ==
+
+= 0.4.1 =
+* A root-relative link in a field label, such as `/privacy-policy/`, is saved as an absolute URL on this site. Any other link that is not a full http or https URL is removed, and the next admin screen shows a dismissible warning that names the field label.
+* The field label is a wide text area that grows with its content, so a long label (including a privacy-policy link) stays visible.
 
 = 0.4.0 =
 * Forms are a field list (type, name, label, required, choices) stored as JSON. The advanced text form uses attributes, for example `{{field type="email" name="email" required}}`.
