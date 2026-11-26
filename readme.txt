@@ -139,7 +139,7 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Mail tokens are `{field:email}`, `{site:title}`, `{site:url}`, `{site:admin_email}`, and `{submission:date}`.
 * Message keys and the control wrapper class use this plugin's own names (`success`, `required`, `oli-cf-control`).
 * Existing forms are converted once. The previous content is kept and can be restored from the editor. The admin shows a migration report.
-* JSON saved in form meta is slashed before `update_post_meta()`, and a later pass rebuilds any JSON that `wp_unslash()` had already damaged. The `[contact-form-7]` shortcode remains available for existing embeds.
+* JSON saved in form meta is slashed before `update_post_meta()`, so newlines and escaped characters survive. A form is converted once and is not rewritten on later loads. The `[contact-form-7]` shortcode remains available for existing embeds.
 * Import reads Gravity Forms, WPForms, Ninja Forms, Fluent Forms, Formidable Forms, and forms saved for the `contact-form-7` shortcode. Nothing is imported until you confirm a preview, and imports are drafts. Source data is not modified.
 
 = 0.3.12 =

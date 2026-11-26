@@ -30,7 +30,7 @@ class Oli_CF_Fields {
 	 *
 	 * @var string
 	 */
-	const SCHEMA = '3';
+	const SCHEMA = '2';
 
 	/**
 	 * Field types this plugin renders.

@@ -182,7 +182,7 @@ class FormModelTest extends Oli_CF_Form_Model_TestCase {
 		$report = Oli_CF_Upgrade::migrate_forms();
 
 		$this->assertSame( 1, $report['converted'] );
-		$this->assertSame( '3', get_post_meta( 4, '_oli_cf_schema', true ) );
+		$this->assertSame( '2', get_post_meta( 4, '_oli_cf_schema', true ) );
 		$this->assertSame( $template, get_post_meta( 4, '_oli_cf_legacy_template', true ) );
 
 		$fields = Oli_CF_Fields::for_form( 4 );
@@ -398,49 +398,52 @@ class FormModelTest extends Oli_CF_Form_Model_TestCase {
 	}
 
 	/**
-	 * JSON damaged by wp_unslash() is rebuilt from the legacy copy, once.
+	 * A later edit survives another upgrade. The legacy copy is not reapplied.
 	 */
-	public function test_repair_restores_escaped_json() {
-		$subject = 'Merci — "café" 😀';
-		$body    = "Ligne 1\nLigne 2 \"citée\"";
-		$mail    = array(
-			'to'      => 'admin@example.com',
-			'from'    => 'admin@example.com',
-			'subject' => $subject,
-			'body'    => $body,
-		);
-		$mail_2  = array(
-			'active'  => true,
-			'to'      => 'ada@example.com',
-			'subject' => $subject,
-			'body'    => $body,
-		);
-
-		$GLOBALS['oli_cf_test_form_ids'] = array( 8 );
+	public function test_upgrade_keeps_later_editor_changes() {
+		$GLOBALS['oli_cf_test_options']  = array();
+		$GLOBALS['oli_cf_test_form_ids'] = array( 11 );
 		$GLOBALS['oli_cf_test_meta']     = array(
-			8 => array(
-				'_oli_cf_schema'          => '2',
-				'_oli_cf_legacy_template' => '[textarea message]',
-				'_oli_cf_legacy_mail'     => $mail,
-				'_oli_cf_legacy_mail_2'   => $mail_2,
+			11 => array(
+				'_oli_cf_form_template' => '[text* your-name]',
+				'_oli_cf_mail'          => array(
+					'to'      => 'admin@example.com',
+					'subject' => 'Hi [your-name]',
+					'body'    => "Hello\n[your-name]",
+				),
 			),
 		);
 
-		$fields = Oli_CF_Fields::from_legacy_template( '[textarea message]' );
-		$notes  = Oli_CF_Notifications::from_legacy_mail( $mail, $mail_2 );
-		$GLOBALS['oli_cf_test_meta'][8][ Oli_CF_Fields::META ]        = wp_unslash( Oli_CF_Fields::encode( $fields ) );
-		$GLOBALS['oli_cf_test_meta'][8][ Oli_CF_Notifications::META ] = wp_unslash( Oli_CF_Notifications::encode( $notes ) );
+		delete_option( Oli_CF_Upgrade::OPTION );
+		Oli_CF_Upgrade::maybe_upgrade();
 
-		$this->assertStringNotContainsString( '\\u2014', Oli_CF_Notifications::read( 8 ) );
-		$this->assertTrue( Oli_CF_Upgrade::repair_form( 8 ) );
+		$this->assertSame( 'your-name', Oli_CF_Fields::for_form( 11 )[0]['name'] );
+		$this->assertSame( 'Hi {field:your-name}', Oli_CF_Notifications::for_form( 11 )[0]['subject'] );
 
-		$stored = Oli_CF_Notifications::for_form( 8 );
-		$this->assertSame( $subject, $stored[0]['subject'] );
-		$this->assertSame( $body, $stored[0]['body'] );
-		$this->assertStringContainsString( '\\n', Oli_CF_Notifications::read( 8 ) );
-		$this->assertStringContainsString( '\\u2014', Oli_CF_Notifications::read( 8 ) );
-		$this->assertSame( '3', get_post_meta( 8, '_oli_cf_schema', true ) );
-		$this->assertFalse( Oli_CF_Upgrade::repair_form( 8 ) );
+		$fields   = Oli_CF_Fields::for_form( 11 );
+		$fields[] = array(
+			'type'     => 'tel',
+			'name'     => 'phone',
+			'label'    => 'Phone',
+			'required' => false,
+		);
+		Oli_CF_Fields::save( 11, $fields );
+
+		$notes                  = Oli_CF_Notifications::for_form( 11 );
+		$notes[0]['subject']    = 'Sujet modifié — "après"';
+		$notes[0]['body']       = "Ligne 1\nLigne 2";
+		Oli_CF_Notifications::save( 11, $notes );
+
+		Oli_CF_Upgrade::maybe_upgrade();
+
+		$kept_fields = Oli_CF_Fields::for_form( 11 );
+		$kept_notes  = Oli_CF_Notifications::for_form( 11 );
+
+		$this->assertSame( 'phone', $kept_fields[1]['name'] );
+		$this->assertSame( 'Sujet modifié — "après"', $kept_notes[0]['subject'] );
+		$this->assertSame( "Ligne 1\nLigne 2", $kept_notes[0]['body'] );
+		$this->assertSame( '2', get_post_meta( 11, '_oli_cf_schema', true ) );
+		$this->assertSame( '[text* your-name]', get_post_meta( 11, '_oli_cf_legacy_template', true ) );
 	}
 
 	/**

@@ -105,7 +105,7 @@ oli_cf_wp_check( isset( $saved[0]['subject'] ) && $subject === $saved[0]['subjec
 oli_cf_wp_check( isset( $saved[0]['body'] ) && $body === $saved[0]['body'], 'editor keeps the multiline body' );
 oli_cf_wp_check( false !== strpos( $raw, '\\n' ), 'stored JSON still contains a newline escape' );
 oli_cf_wp_check( false !== strpos( $raw, '\\u2014' ), 'stored JSON still contains the em dash escape' );
-oli_cf_wp_check( '3' === (string) get_post_meta( (int) $form_id, '_oli_cf_schema', true ), 'editor writes schema 3' );
+oli_cf_wp_check( '2' === (string) get_post_meta( (int) $form_id, '_oli_cf_schema', true ), 'editor writes schema 2' );
 
 $legacy_mail = array(
 	'active'  => true,
@@ -134,15 +134,6 @@ $damaged = Oli_CF_Notifications::read( (int) $form_id );
 oli_cf_wp_check( $damaged !== $good, 'writing JSON without wp_slash changes it' );
 oli_cf_wp_check( false === strpos( $damaged, '\\n' ), 'the damaged JSON lost its newline escape' );
 oli_cf_wp_check( false !== strpos( $damaged, 'u2014' ) && false === strpos( $damaged, '\\u2014' ), 'the damaged JSON turned the em dash escape into u2014' );
-
-oli_cf_wp_check( true === Oli_CF_Upgrade::repair_form( (int) $form_id ), 'repair rewrites JSON that differs from the legacy copy' );
-
-$repaired = Oli_CF_Notifications::for_form( (int) $form_id );
-
-oli_cf_wp_check( isset( $repaired[0]['subject'] ) && $subject === $repaired[0]['subject'], 'repair restores the em dash, quotes, accent and emoji' );
-oli_cf_wp_check( isset( $repaired[0]['body'] ) && $body === $repaired[0]['body'], 'repair restores the multiline body' );
-oli_cf_wp_check( false === Oli_CF_Upgrade::repair_form( (int) $form_id ), 'a second repair does not rewrite matching JSON' );
-oli_cf_wp_check( '3' === (string) get_post_meta( (int) $form_id, '_oli_cf_schema', true ), 'repair sets schema 3' );
 
 update_post_meta( (int) $form_id, Oli_CF_Notifications::META, $good );
 oli_cf_wp_check( true === Oli_CF_Upgrade::restore_form( (int) $form_id ), 'restore rebuilds from the legacy copy' );
@@ -198,6 +189,82 @@ $imported_raw   = $draft_id ? Oli_CF_Notifications::read( $draft_id ) : '';
 oli_cf_wp_check( isset( $imported_notes[0]['subject'] ) && $subject === $imported_notes[0]['subject'], 'import keeps the em dash, quotes, accent and emoji' );
 oli_cf_wp_check( isset( $imported_notes[0]['body'] ) && $body === $imported_notes[0]['body'], 'import keeps the multiline body' );
 oli_cf_wp_check( false !== strpos( $imported_raw, '\\u2014' ), 'imported JSON keeps the em dash escape' );
+
+$_POST    = array();
+$legacy_id = wp_insert_post(
+	array(
+		'post_type'   => 'oli_contact_form',
+		'post_status' => 'publish',
+		'post_title'  => 'Avant 0.4.0',
+	),
+	true
+);
+update_post_meta( (int) $legacy_id, '_oli_cf_form_template', '[text* your-name]' );
+update_post_meta(
+	(int) $legacy_id,
+	'_oli_cf_mail',
+	array(
+		'active'  => true,
+		'to'      => 'admin@example.com',
+		'from'    => 'admin@example.com',
+		'subject' => 'Hi [your-name]',
+		'body'    => "Hello\n[your-name]",
+	)
+);
+
+delete_option( Oli_CF_Upgrade::OPTION );
+Oli_CF_Upgrade::maybe_upgrade();
+
+$converted_fields = Oli_CF_Fields::for_form( (int) $legacy_id );
+
+oli_cf_wp_check( isset( $converted_fields[0]['name'] ) && 'your-name' === $converted_fields[0]['name'], 'upgrade converts the old template once' );
+oli_cf_wp_check( '[text* your-name]' === (string) get_post_meta( (int) $legacy_id, '_oli_cf_legacy_template', true ), 'upgrade keeps the original template copy' );
+
+$edited_subject = 'Sujet modifié — "après" 😀';
+$edited_body    = "Ligne éditée\nDeuxième ligne";
+
+$_POST = array(
+	'oli_cf_nonce'         => wp_create_nonce( 'oli_cf_save_form' ),
+	'oli_cf_fields'        => array(
+		array(
+			'type'     => 'text',
+			'name'     => 'your-name',
+			'label'    => 'Your name',
+			'required' => '1',
+		),
+		array(
+			'type'  => 'tel',
+			'name'  => 'phone',
+			'label' => 'Phone',
+		),
+	),
+	'oli_cf_notifications' => array(
+		array(
+			'id'                 => 'admin',
+			'label'              => 'Admin',
+			'enabled'            => '1',
+			'to'                 => 'admin@example.com',
+			'from'               => 'admin@example.com',
+			'subject'            => $edited_subject,
+			'body'               => $edited_body,
+			'condition_operator' => 'always',
+		),
+	),
+);
+$editor->save_form_data( (int) $legacy_id, get_post( (int) $legacy_id ) );
+
+clean_post_cache( (int) $legacy_id );
+wp_cache_flush();
+$raw_before_reload = Oli_CF_Notifications::read( (int) $legacy_id );
+Oli_CF_Upgrade::maybe_upgrade();
+oli_cf_wp_check( Oli_CF_Notifications::read( (int) $legacy_id ) === $raw_before_reload, 'reloading and upgrading does not rewrite the stored JSON' );
+
+$kept_fields = Oli_CF_Fields::for_form( (int) $legacy_id );
+$kept_notes  = Oli_CF_Notifications::for_form( (int) $legacy_id );
+
+oli_cf_wp_check( isset( $kept_fields[1]['name'] ) && 'phone' === $kept_fields[1]['name'], 'a later upgrade keeps the field added in the editor' );
+oli_cf_wp_check( isset( $kept_notes[0]['subject'] ) && $edited_subject === $kept_notes[0]['subject'], 'a later upgrade keeps the edited subject' );
+oli_cf_wp_check( isset( $kept_notes[0]['body'] ) && $edited_body === $kept_notes[0]['body'], 'a later upgrade keeps the edited multiline body' );
 
 if ( ! empty( $GLOBALS['oli_cf_wp_failures'] ) ) {
 	fwrite( STDERR, count( $GLOBALS['oli_cf_wp_failures'] ) . " assertion(s) failed.\n" );
