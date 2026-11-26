@@ -63,6 +63,34 @@ if ( class_exists( '\PHPUnit\Framework\TestCase' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_Post' ) ) {
+	/**
+	 * Post object for the editor save test.
+	 */
+	class WP_Post {
+		/**
+		 * @var int
+		 */
+		public $ID = 0;
+
+		/**
+		 * @var string
+		 */
+		public $post_type = '';
+	}
+}
+
+if ( ! function_exists( 'wp_verify_nonce' ) ) {
+	/**
+	 * @param string $nonce  Nonce.
+	 * @param string $action Action.
+	 * @return bool
+	 */
+	function wp_verify_nonce( $nonce, $action = '' ) {
+		return 'oli-cf-test-nonce' === (string) $nonce && 'oli_cf_save_form' === (string) $action;
+	}
+}
+
 /**
  * Form model tests.
  */
@@ -435,6 +463,145 @@ class FormModelTest extends Oli_CF_Form_Model_TestCase {
 		$this->assertSame( 'Phone', Oli_CF_Fields::type_label( 'tel' ) );
 		$this->assertSame( 'Paragraph', Oli_CF_Fields::type_label( 'textarea' ) );
 		$this->assertSame( 'Submit', Oli_CF_Fields::type_label( 'submit' ) );
+	}
+
+	/**
+	 * Publishing keeps the privacy-policy link that a new form starts with.
+	 */
+	public function test_privacy_link_survives_the_editor_save() {
+		require_once dirname( __DIR__ ) . '/admin/class-oli-cf-meta-boxes.php';
+
+		$previous_post = isset( $_POST ) ? $_POST : array();
+		$previous_can  = isset( $GLOBALS['oli_cf_test_can_manage'] ) ? $GLOBALS['oli_cf_test_can_manage'] : null;
+		$GLOBALS['oli_cf_test_can_manage'] = true;
+		$GLOBALS['oli_cf_test_privacy_url'] = 'https://example.com/privacy-policy';
+		$form_id = 4242;
+		$post = new WP_Post();
+		$post->ID = $form_id;
+		$post->post_type = 'oli_contact_form';
+		$editor = new Oli_CF_Meta_Boxes();
+
+		try {
+			$href = 'href="https://example.com/privacy-policy"';
+			$this->save_builder( $editor, $post, $this->rows_from_fields( Oli_CF_Fields::defaults() ) );
+			$saved = $this->stored_fields( $form_id );
+			$label = $this->consent_label( $saved );
+			$this->assertStringContainsString( $href, $label, 'first publish keeps the privacy link' );
+			$this->assertStringContainsString( '<a href=\\', (string) get_post_meta( $form_id, Oli_CF_Fields::META, true ), 'stored JSON keeps the anchor' );
+			$this->assertStringContainsString( 'privacy-policy', (string) get_post_meta( $form_id, Oli_CF_Fields::META, true ), 'stored JSON keeps the privacy URL' );
+
+			$this->save_builder( $editor, $post, $this->rows_from_fields( $saved ) );
+			$again = $this->stored_fields( $form_id );
+			$this->assertStringContainsString( $href, $this->consent_label( $again ), 'a second save keeps the privacy link' );
+
+			$html = Oli_CF_Form_Parser::render_fields( $again, $form_id );
+			$this->assertStringContainsString( $href, $html, 'the public form keeps the privacy link' );
+			$this->assertStringContainsString( '>privacy policy</a>', $html, 'the public form shows the link text' );
+
+			$markup = Oli_CF_Fields::to_markup( $again );
+			$this->assertStringNotContainsString( 'href="https://example.com/privacy-policy"', $markup, 'markup escapes the quotes inside the label' );
+			$_POST = array(
+				'oli_cf_nonce'         => 'oli-cf-test-nonce',
+				'oli_cf_use_markup'    => '1',
+				'oli_cf_fields_markup' => $markup,
+			);
+			$editor->save_form_data( $form_id, $post );
+			$from_markup = $this->stored_fields( $form_id );
+			$this->assertStringContainsString( $href, $this->consent_label( $from_markup ), 'the markup path keeps the privacy link' );
+
+			unset( $GLOBALS['oli_cf_test_privacy_url'] );
+			$this->save_builder( $editor, $post, $this->rows_from_fields( Oli_CF_Fields::defaults() ) );
+			$plain = $this->consent_label( $this->stored_fields( $form_id ) );
+			$this->assertSame( 'I consent to being contacted about this inquiry.', $plain, 'no privacy page means no link' );
+			$this->assertStringNotContainsString( '<a', $plain );
+
+			$hostile = $this->rows_from_fields( Oli_CF_Fields::defaults() );
+			foreach ( $hostile as $index => $row ) {
+				if ( 'consent' === $row['name'] ) {
+					$hostile[ $index ]['label'] = 'Agree <a href="javascript:alert(1)" onclick="alert(1)" target="_blank">here</a> <a href="https://example.com/privacy-policy" onclick="alert(2)" target="_blank">privacy policy</a>';
+				}
+			}
+			$this->save_builder( $editor, $post, $hostile );
+			$cleaned = $this->consent_label( $this->stored_fields( $form_id ) );
+			$this->assertStringNotContainsString( 'javascript:', $cleaned, 'a javascript URL is rejected' );
+			$this->assertStringNotContainsString( 'onclick', $cleaned, 'extra attributes are rejected' );
+			$this->assertStringNotContainsString( 'target', $cleaned, 'extra attributes are rejected' );
+			$this->assertStringContainsString( $href, $cleaned, 'an https link is kept without the extra attributes' );
+			$hostile_html = Oli_CF_Form_Parser::render_fields( $this->stored_fields( $form_id ), $form_id );
+			$this->assertStringNotContainsString( 'javascript:', $hostile_html );
+			$this->assertStringNotContainsString( 'onclick', $hostile_html );
+		} finally {
+			$_POST = $previous_post;
+			unset( $GLOBALS['oli_cf_test_privacy_url'] );
+			if ( null === $previous_can ) {
+				unset( $GLOBALS['oli_cf_test_can_manage'] );
+			} else {
+				$GLOBALS['oli_cf_test_can_manage'] = $previous_can;
+			}
+		}
+	}
+
+	/**
+	 * Save the field builder the way the editor does.
+	 *
+	 * @param Oli_CF_Meta_Boxes    $editor Meta boxes.
+	 * @param WP_Post              $post   Form.
+	 * @param array<int, mixed>    $rows   Posted rows.
+	 */
+	private function save_builder( $editor, $post, $rows ) {
+		$_POST = array(
+			'oli_cf_nonce'  => 'oli-cf-test-nonce',
+			'oli_cf_fields' => $rows,
+		);
+		$editor->save_form_data( $post->ID, $post );
+	}
+
+	/**
+	 * @param int $form_id Form ID.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function stored_fields( $form_id ) {
+		return Oli_CF_Fields::decode( Oli_CF_Fields::read( $form_id ) );
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $fields Fields.
+	 * @return string
+	 */
+	private function consent_label( $fields ) {
+		foreach ( $fields as $field ) {
+			if ( 'consent' === $field['name'] ) {
+				return (string) $field['label'];
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $fields Fields.
+	 * @return array<int, array<string, string>>
+	 */
+	private function rows_from_fields( $fields ) {
+		$rows = array();
+
+		foreach ( $fields as $field ) {
+			$rows[] = array(
+				'type'        => (string) $field['type'],
+				'name'        => (string) $field['name'],
+				'label'       => (string) $field['label'],
+				'required'    => ! empty( $field['required'] ) ? '1' : '',
+				'placeholder' => (string) $field['placeholder'],
+				'default'     => (string) $field['default'],
+				'maxlength'   => (string) $field['maxlength'],
+				'minlength'   => (string) $field['minlength'],
+				'limit'       => (string) $field['limit'],
+				'filetypes'   => (string) $field['filetypes'],
+				'options'     => implode( "\n", $field['options'] ),
+			);
+		}
+
+		return $rows;
 	}
 
 	/**

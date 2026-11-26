@@ -316,7 +316,7 @@ class Oli_CF_Fields {
 			$attrs    = self::parse_markup_attributes( $raw );
 			$type     = isset( $attrs['type'] ) ? $attrs['type'] : 'text';
 			$name     = isset( $attrs['name'] ) ? $attrs['name'] : '';
-			$label    = isset( $attrs['label'] ) ? $attrs['label'] : '';
+			$label    = isset( $attrs['label'] ) ? self::unescape_markup_attribute( $attrs['label'] ) : '';
 			$required = isset( $attrs['required'] );
 
 			if ( isset( $attrs['optional'] ) ) {
@@ -367,7 +367,7 @@ class Oli_CF_Fields {
 			$parts[] = 'name="' . $field['name'] . '"';
 
 			if ( '' !== $field['label'] ) {
-				$parts[] = 'label="' . str_replace( '"', '', $field['label'] ) . '"';
+				$parts[] = 'label="' . self::escape_markup_attribute( $field['label'] ) . '"';
 			}
 
 			if ( 'acceptance' === $field['type'] ) {
@@ -553,6 +553,77 @@ class Oli_CF_Fields {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Fields posted by the editor.
+	 *
+	 * Labels are not passed through sanitize_textarea_field(), which strips every tag.
+	 * sanitize_label() keeps one simple http(s) link and drops anything else.
+	 *
+	 * @param mixed $posted Posted rows, already unslashed.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function from_builder_post( $posted ) {
+		if ( ! is_array( $posted ) ) {
+			return array();
+		}
+
+		if ( function_exists( 'map_deep' ) ) {
+			$posted = map_deep( $posted, 'wp_kses_post' );
+		}
+
+		return self::from_posted( self::sanitize_builder_input( $posted ) );
+	}
+
+	/**
+	 * Text form posted by the editor.
+	 *
+	 * @param mixed $markup Posted markup, already unslashed.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function from_markup_post( $markup ) {
+		return self::from_markup( wp_kses_post( (string) $markup ) );
+	}
+
+	/**
+	 * Sanitize builder rows without stripping a label's privacy link.
+	 *
+	 * @param mixed $posted Posted rows.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function sanitize_builder_input( $posted ) {
+		if ( ! is_array( $posted ) ) {
+			return array();
+		}
+
+		$clean = array();
+
+		foreach ( $posted as $index => $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$clean[ $index ] = array();
+
+			foreach ( $row as $key => $value ) {
+				if ( is_array( $value ) ) {
+					$clean[ $index ][ $key ] = $value;
+					continue;
+				}
+
+				$value = (string) $value;
+
+				if ( 'label' === (string) $key ) {
+					$clean[ $index ][ $key ] = $value;
+					continue;
+				}
+
+				$clean[ $index ][ $key ] = sanitize_textarea_field( $value );
+			}
+		}
+
+		return $clean;
 	}
 
 	/**
@@ -760,6 +831,30 @@ class Oli_CF_Fields {
 		}
 
 		return $clean;
+	}
+
+	/**
+	 * Encode a label so it can sit inside a double-quoted markup attribute.
+	 *
+	 * @param string $value Label.
+	 * @return string
+	 */
+	private static function escape_markup_attribute( $value ) {
+		return str_replace(
+			array( '&', '"', '<', '>' ),
+			array( '&amp;', '&quot;', '&lt;', '&gt;' ),
+			(string) $value
+		);
+	}
+
+	/**
+	 * Reverse escape_markup_attribute().
+	 *
+	 * @param string $value Attribute value.
+	 * @return string
+	 */
+	private static function unescape_markup_attribute( $value ) {
+		return html_entity_decode( (string) $value, ENT_QUOTES, 'UTF-8' );
 	}
 
 	/**

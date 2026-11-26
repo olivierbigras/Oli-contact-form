@@ -114,6 +114,25 @@ if ( ! function_exists( 'sanitize_html_class' ) ) {
 	}
 }
 
+if ( ! function_exists( 'map_deep' ) ) {
+	/**
+	 * @param mixed    $value    Value.
+	 * @param callable $callback Callback.
+	 * @return mixed
+	 */
+	function map_deep( $value, $callback ) {
+		if ( is_array( $value ) ) {
+			foreach ( $value as $index => $item ) {
+				$value[ $index ] = map_deep( $item, $callback );
+			}
+
+			return $value;
+		}
+
+		return call_user_func( $callback, $value );
+	}
+}
+
 if ( ! function_exists( 'wp_unslash' ) ) {
 	/**
 	 * @param mixed $value Value.
