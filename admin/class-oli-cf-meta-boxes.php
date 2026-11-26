@@ -456,9 +456,9 @@ class Oli_CF_Meta_Boxes {
 		$use_markup = isset( $_POST['oli_cf_use_markup'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['oli_cf_use_markup'] ) );
 
 		if ( $use_markup && isset( $_POST['oli_cf_fields_markup'] ) ) {
-			$fields = Oli_CF_Fields::from_markup_post( wp_kses_post( wp_unslash( $_POST['oli_cf_fields_markup'] ) ) );
+			$fields = Oli_CF_Fields::from_markup_post( wp_unslash( $_POST['oli_cf_fields_markup'] ) );
 		} else {
-			$posted = isset( $_POST['oli_cf_fields'] ) ? map_deep( wp_unslash( $_POST['oli_cf_fields'] ), 'wp_kses_post' ) : array();
+			$posted = isset( $_POST['oli_cf_fields'] ) ? wp_unslash( $_POST['oli_cf_fields'] ) : array();
 			$fields = Oli_CF_Fields::from_builder_post( $posted );
 		}
 

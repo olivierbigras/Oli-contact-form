@@ -558,7 +558,7 @@ class Oli_CF_Fields {
 	/**
 	 * Fields posted by the editor.
 	 *
-	 * Labels are not passed through sanitize_textarea_field(), which strips every tag.
+	 * Labels are not passed through sanitize_textarea_field() or wp_kses_post().
 	 * sanitize_label() keeps one simple http(s) link and drops anything else.
 	 *
 	 * @param mixed $posted Posted rows, already unslashed.
@@ -569,21 +569,20 @@ class Oli_CF_Fields {
 			return array();
 		}
 
-		if ( function_exists( 'map_deep' ) ) {
-			$posted = map_deep( $posted, 'wp_kses_post' );
-		}
-
 		return self::from_posted( self::sanitize_builder_input( $posted ) );
 	}
 
 	/**
 	 * Text form posted by the editor.
 	 *
+	 * The label is decoded and passed to sanitize_label(). It is not run through
+	 * wp_kses_post() first, because that rewrites a rejected URL before the scheme check.
+	 *
 	 * @param mixed $markup Posted markup, already unslashed.
 	 * @return array<int, array<string, mixed>>
 	 */
 	public static function from_markup_post( $markup ) {
-		return self::from_markup( wp_kses_post( (string) $markup ) );
+		return self::from_markup( (string) $markup );
 	}
 
 	/**
@@ -800,7 +799,16 @@ class Oli_CF_Fields {
 	 * @return string
 	 */
 	private static function capture_label_link( $matches ) {
-		$href = esc_url( $matches[2] );
+		$raw = trim( (string) $matches[2] );
+
+		// Judge the address that was written, not the one esc_url() would invent.
+		// wp_kses_post() can turn javascript:alert(1) into alert(1), and esc_url()
+		// then turns that into http://alert(1).
+		if ( 1 !== preg_match( '#\Ahttps?://#i', $raw ) ) {
+			return wp_strip_all_tags( $matches[3] );
+		}
+
+		$href = esc_url( $raw );
 
 		if ( ! is_string( $href ) || 1 !== preg_match( '#\Ahttps?://#i', $href ) ) {
 			return wp_strip_all_tags( $matches[3] );

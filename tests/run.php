@@ -77,6 +77,13 @@ if ( 0 !== (int) $code ) {
 	if ( 0 !== (int) $code ) {
 		++$failed;
 	}
+
+	echo "=== LabelLinkWpTest.php ===\n";
+	passthru( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( $wp_cli ) . ' --path=' . escapeshellarg( $wp_root ) . ' eval-file ' . escapeshellarg( __DIR__ . '/LabelLinkWpTest.php' ), $code );
+
+	if ( 0 !== (int) $code ) {
+		++$failed;
+	}
 }
 
 if ( $failed > 0 ) {
