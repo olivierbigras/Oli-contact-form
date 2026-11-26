@@ -294,7 +294,7 @@ class UploadCleanupTest extends Oli_CF_Upload_Cleanup_TestCase {
 		$messages = Oli_CF_Validator::default_messages();
 
 		$this->assertSame(
-			$messages['upload_file_type'],
+			$messages['file_type'],
 			Oli_CF_Validator::validate_file(
 				$php['file'],
 				array( 'filetypes' => 'jpg|jpeg|png' ),
@@ -302,7 +302,7 @@ class UploadCleanupTest extends Oli_CF_Upload_Cleanup_TestCase {
 			)
 		);
 		$this->assertSame(
-			$messages['upload_file_type'],
+			$messages['file_type'],
 			Oli_CF_Validator::validate_file(
 				$txt['file'],
 				array( 'filetypes' => 'jpg|jpeg|png' ),

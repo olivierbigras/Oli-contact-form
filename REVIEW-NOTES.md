@@ -15,7 +15,7 @@ This matches the documented exception for plugins that perform a service (simila
 Loading is gated:
 
 1. An administrator must enable the service and save a site key under Oli Contact Forms → Settings.
-2. The client script is enqueued only when a form is present on the page (shortcode `[oli_contact_form]`, the `oli-cf/contact-form` block, or a mapped CF7 shortcode when compatibility mode is on).
+2. The client script is enqueued only when a form is present on the page (shortcode `[oli_contact_form]`, the `oli-cf/contact-form` block, or the `contact-form-7` shortcode when that compatibility setting is on).
 3. `siteverify` runs only on form submit, and only if that service is enabled.
 
 The built-in honeypot never leaves the site. Secret keys stay in the options table and are never printed in storefront HTML or JavaScript.

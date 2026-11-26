@@ -98,20 +98,20 @@ oli_cf_assert_same( '#oli-cf-response-6', Oli_CF_Submission::redirect_fragment( 
 oli_cf_assert_same( '#oli-cf-form-6', Oli_CF_Submission::redirect_fragment( 6, false ), 'no-status fragment stays on the form' );
 
 oli_cf_assert_true(
-	Oli_CF_Shortcode::should_register_cf7_compat( array( 'cf7_compat_enabled' => true ) ),
-	'compat shortcode registers when enabled and CF7 is absent'
+	Oli_CF_Shortcode::should_register_legacy_shortcode( array( 'legacy_shortcode_compat' => true ) ),
+	'legacy shortcode registers when enabled and the other shortcode is absent'
 );
 
 $GLOBALS['oli_cf_test_shortcodes']['contact-form-7'] = true;
 oli_cf_assert_false(
-	Oli_CF_Shortcode::should_register_cf7_compat( array( 'cf7_compat_enabled' => true ) ),
-	'compat shortcode is skipped when [contact-form-7] already exists'
+	Oli_CF_Shortcode::should_register_legacy_shortcode( array( 'legacy_shortcode_compat' => true ) ),
+	'legacy shortcode is skipped when [contact-form-7] already exists'
 );
 unset( $GLOBALS['oli_cf_test_shortcodes']['contact-form-7'] );
 
 oli_cf_assert_false(
-	Oli_CF_Shortcode::should_register_cf7_compat( array( 'cf7_compat_enabled' => false ) ),
-	'compat shortcode stays off when the setting is disabled'
+	Oli_CF_Shortcode::should_register_legacy_shortcode( array( 'legacy_shortcode_compat' => false ) ),
+	'legacy shortcode stays off when the setting is disabled'
 );
 
 $required_html = Oli_CF_Form_Parser::parse( '<label> Your name [text* your-name] </label>', 5 );

@@ -21,14 +21,14 @@ class Oli_CF_Settings {
 	 */
 	public static function get_defaults() {
 		return array(
-			'recaptcha_enabled'    => false,
-			'recaptcha_version'    => 'v3',
-			'recaptcha_site_key'   => '',
-			'recaptcha_secret_key' => '',
-			'turnstile_enabled'    => false,
-			'turnstile_site_key'   => '',
-			'turnstile_secret_key' => '',
-			'cf7_compat_enabled'   => false,
+			'recaptcha_enabled'       => false,
+			'recaptcha_version'       => 'v3',
+			'recaptcha_site_key'      => '',
+			'recaptcha_secret_key'    => '',
+			'turnstile_enabled'       => false,
+			'turnstile_site_key'      => '',
+			'turnstile_secret_key'    => '',
+			'legacy_shortcode_compat' => false,
 		);
 	}
 
@@ -145,20 +145,20 @@ class Oli_CF_Settings {
 
 		add_settings_section(
 			'oli_cf_compat_section',
-			__( 'Contact Form 7 Compatibility', 'oli-contact-form' ),
+			__( 'Existing shortcodes', 'oli-contact-form' ),
 			array( $this, 'render_compat_section' ),
 			'oli-cf-settings'
 		);
 
 		add_settings_field(
-			'cf7_compat_enabled',
-			__( 'Enable CF7 Shortcode Mapping', 'oli-contact-form' ),
+			'legacy_shortcode_compat',
+			__( 'Keep the contact-form-7 shortcode', 'oli-contact-form' ),
 			array( $this, 'render_checkbox_field' ),
 			'oli-cf-settings',
 			'oli_cf_compat_section',
 			array(
-				'field'       => 'cf7_compat_enabled',
-				'description' => __( 'Allow [contact-form-7] shortcode to be served by Oli Contact Form after migration.', 'oli-contact-form' ),
+				'field'       => 'legacy_shortcode_compat',
+				'description' => __( 'Serve imported forms that are still embedded with the contact-form-7 shortcode. This stays off while another plugin already provides that shortcode.', 'oli-contact-form' ),
 			)
 		);
 	}
@@ -196,7 +196,7 @@ class Oli_CF_Settings {
 	 * Render compatibility section description.
 	 */
 	public function render_compat_section() {
-		echo '<p>' . esc_html__( 'These options help with migration from Contact Form 7.', 'oli-contact-form' ) . '</p>';
+		echo '<p>' . esc_html__( 'Use this when a site already embeds forms with the contact-form-7 shortcode.', 'oli-contact-form' ) . '</p>';
 	}
 
 	/**
@@ -256,6 +256,26 @@ class Oli_CF_Settings {
 	}
 
 	/**
+	 * Read the shortcode setting, including a value posted under a previous key.
+	 *
+	 * @param array<string, mixed> $input Posted settings.
+	 * @return bool
+	 */
+	private static function posted_legacy_shortcode( $input ) {
+		if ( array_key_exists( 'legacy_shortcode_compat', $input ) ) {
+			return ! empty( $input['legacy_shortcode_compat'] );
+		}
+
+		$legacy = class_exists( 'Oli_CF_Import_Registry' ) ? Oli_CF_Import_Registry::legacy_option_key() : '';
+
+		if ( '' !== $legacy && array_key_exists( $legacy, $input ) ) {
+			return ! empty( $input[ $legacy ] );
+		}
+
+		return false;
+	}
+
+	/**
 	 * Render text field.
 	 *
 	 * @param array<string, string> $args Field arguments.
@@ -292,7 +312,7 @@ class Oli_CF_Settings {
 		$sanitized['turnstile_site_key']   = isset( $input['turnstile_site_key'] ) ? sanitize_text_field( $input['turnstile_site_key'] ) : '';
 		$sanitized['turnstile_secret_key'] = isset( $input['turnstile_secret_key'] ) ? sanitize_text_field( $input['turnstile_secret_key'] ) : '';
 
-		$sanitized['cf7_compat_enabled'] = ! empty( $input['cf7_compat_enabled'] );
+		$sanitized['legacy_shortcode_compat'] = self::posted_legacy_shortcode( $input );
 
 		return $sanitized;
 	}

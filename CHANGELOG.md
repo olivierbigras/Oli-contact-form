@@ -5,13 +5,26 @@ All notable changes to Oli Contact Form will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-11-26
+
+### Ajouté
+- Constructeur de champs : chaque formulaire est une liste (type, nom, libellé, requis, options) enregistrée en JSON. Le texte avancé utilise `{{field type="email" name="courriel" required}}`.
+- Notifications : liste extensible (avis à l'administrateur, confirmation à l'expéditeur, autres) avec destinataires, sujet, corps et condition simple.
+- Jetons de courriel `{field:courriel}`, `{site:title}`, `{site:url}`, `{site:admin_email}`, `{submission:date}`.
+- Import en brouillon depuis Gravity Forms, WPForms, Ninja Forms, Fluent Forms, Formidable Forms, et les formulaires qui utilisent le shortcode `contact-form-7`, avec aperçu des champs non pris en charge. Les données sources ne sont pas modifiées.
+
+### Modifié
+- Les formulaires déjà enregistrés sont convertis une seule fois. L'ancien contenu est conservé et peut être restauré. Un avis d'administration résume la conversion.
+- Clés de message (`success`, `send_error`, `required`, …) et classe CSS `oli-cf-control`.
+- Le réglage qui conserve le shortcode `contact-form-7` s'appelle `legacy_shortcode_compat`. L'ancienne page d'import redirige vers Importer.
+
 ## [0.3.12] - 2026-10-27
 
 ### Modifié
 - Readme : la description courte indique que les pièces jointes ne sont « jamais conservées sur votre site » (« never kept on your site »).
 
 ### Sécurité
-- La notice de résultat d'import CF7 exige un nonce dédié (`oli_cf_imported_nonce`), ajouté aux deux redirections de l'importeur.
+- La notice de résultat d'import exige un nonce dédié (`oli_cf_imported_nonce`), ajouté aux deux redirections de l'importeur.
 - Le masquage de la notice de staging vérifie le nonce avec `wp_verify_nonce()` avant toute lecture de la requête.
 - Les réglages de courriel sont lus via `filter_input()` puis nettoyés champ par champ par `Oli_CF_Mailer::sanitize_mail_settings()` (les balises `<[champ]>` sont conservées), sans `phpcs:ignore`.
 - Échappement tardif : le gabarit du formulaire et le widget reCAPTCHA passent par `wp_kses()` avec une liste blanche explicite à l'affichage.
@@ -74,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No-JS validation was shown as a generic send error. Redirects now set `oli_cf_status=validation` or `mail_failed` and replay sanitized values plus per-field errors from a 5-minute token transient (no PII in the URL).
 - JS error summary names the field (`Label : message`) and uses singular/plural strings.
 - `.oli-cf-response-output` has `tabindex="-1"` and receives focus after a no-JS return.
-- Imported CF7 `[acceptance]` is required by default, like CF7, with or without `*`. It is optional only when the CF7 `optional` option is present. The plugin default form still uses `[acceptance … optional]`.
+- An imported acceptance field is required by default, with or without a required mark. It is optional only when the source marks it optional.
 
 ## [0.3.2] - 2026-10-26
 
@@ -88,16 +101,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Non-JS submits redirected to the homepage because `wp_get_referer()` is false on a same-page POST. Redirect uses a hidden permalink validated with `wp_validate_redirect()`, then `wp_get_raw_referer()`, and lands on `#oli-cf-form-{id}`.
 - reCAPTCHA v3 siteverify responses without a `score` are rejected. v2 still accepts `success: true`.
 - Front end loads `api.js` without `render=` and the checkbox widget for v2; v3 keeps `api.js?render=` plus `grecaptcha.execute`. AJAX treats a JSON success payload as success even if the transport used the error callback.
-- CF7 `[file your-file limit:… filetypes:…]` keeps those options. Existing type/size rules, `.php` rejection, attach-then-delete still apply.
-- CF7 `[acceptance]…[/acceptance]` uses the inner text as the checkbox label.
+- An imported file field keeps its size limit and allowed types. Existing type/size rules, `.php` rejection, attach-then-delete still apply.
+- Paired acceptance markup uses the inner text as the checkbox label.
 - Keyboard focus uses `:focus-visible` (2px `#0073aa` on fields, `#1d2327` on the submit button). Field borders are `#8c8f94` (3.24:1).
-- `[contact-form-7]` is registered only when compatibility mode is on **and** Contact Form 7 is not active.
+- `[contact-form-7]` is registered only when the legacy shortcode setting is on and no other plugin already provides that shortcode.
 
 ## [0.3.1] - 2026-10-26
 
 ### Fixed
 - reCAPTCHA v2 submissions were rejected because the verifier required a `score` that v2 does not return. `success: true` is enough for v2; the 0.5 score threshold applies only to v3. Hostname is checked when present (official Google test keys that report `testkey.google.com` remain accepted). Turnstile is unchanged.
-- Contact Form 7 special mail-tags (`[_site_admin_email]`, `[_site_title]`, `[_site_url]`, `[_site_description]`, `[_remote_ip]`, `[_date]`, `[_time]`, `[_url]`, `[_post_title]`, and related) are resolved when mail is built. If the resolved recipient is empty or invalid, the site `admin_email` is used and the case is logged when `WP_DEBUG` is on.
+- Site and submission mail tokens are resolved when mail is built. If the resolved recipient is empty or invalid, the site `admin_email` is used and the case is logged when `WP_DEBUG` is on.
 - `maxlength` and `minlength` are validated on the server with `mb_strlen` and rendered on text inputs and textareas.
 
 ## [0.3.0] - 2026-10-26
@@ -107,14 +120,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `load_plugin_textdomain()`. WordPress.org language packs load the `oli-contact-form` text domain automatically.
 
 ### Added
-- CLI tests for validation, mail building, upload deletion, and Contact Form 7 import.
+- CLI tests for validation, mail building, upload deletion, and form import.
 - Editable field-level validation messages (required, email, phone, file type/size, acceptance).
 - `phone` form tag as an alias of `tel`.
 - File staging with extension and size limits. Staged files are attached to the notification email and deleted immediately after send.
 
 ### Changed
 - Author URI is `https://github.com/olivierbigras`. Plugin URI stays `https://github.com/olivierbigras/Oli-contact-form`.
-- CF7 importer converts form tags, mail (including Reply-To), mail 2, and messages.
+- The importer converts fields, mail (including Reply-To), a second message, and messages.
 - Honeypot remains the built-in anti-spam measure; reCAPTCHA v3 and Turnstile stay optional and load only on form pages.
 - Gutenberg block uses API version 3 and `wp-block-editor`.
 
@@ -138,7 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Document Google reCAPTCHA v3 and Cloudflare Turnstile in `readme.txt` under `== External services ==`.
-- Extract the CF7 importer "select all" inline script into `assets/js/oli-cf-importer.js`.
+- Extract the importer "select all" inline script into `assets/js/oli-cf-importer.js`.
 - Move the honeypot off-screen style into `assets/css/oli-cf-public.css`.
 - Prefix captcha script handles as `oli-cf-recaptcha` and `oli-cf-turnstile`.
 - Enqueue public CSS/JS and captcha scripts only when a form is present.

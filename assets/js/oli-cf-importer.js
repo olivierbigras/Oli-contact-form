@@ -1,5 +1,5 @@
 /**
- * CF7 importer admin script for Oli Contact Form.
+ * Form importer admin script for Oli Contact Form.
  */
 (function () {
 	'use strict';

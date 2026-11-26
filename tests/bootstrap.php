@@ -688,6 +688,31 @@ if ( ! function_exists( 'get_post_meta' ) ) {
 	}
 }
 
+if ( ! function_exists( 'update_post_meta' ) ) {
+	/**
+	 * @param int    $id    ID.
+	 * @param string $key   Key.
+	 * @param mixed  $value Value.
+	 * @return bool
+	 */
+	function update_post_meta( $id, $key, $value ) {
+		$GLOBALS['oli_cf_test_meta'][ (int) $id ][ (string) $key ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_post_meta' ) ) {
+	/**
+	 * @param int    $id  ID.
+	 * @param string $key Key.
+	 * @return bool
+	 */
+	function delete_post_meta( $id, $key ) {
+		unset( $GLOBALS['oli_cf_test_meta'][ (int) $id ][ (string) $key ] );
+		return true;
+	}
+}
+
 if ( ! function_exists( 'wp_mail' ) ) {
 	/**
 	 * @param string|string[] $to          To.
@@ -956,11 +981,15 @@ function oli_cf_assert_false( $actual, $label ) {
 }
 
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-form-parser.php';
+require_once dirname( __DIR__ ) . '/includes/class-oli-cf-fields.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-uploads.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-validator.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-mailer.php';
+require_once dirname( __DIR__ ) . '/includes/class-oli-cf-notifications.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-anti-spam.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-submission.php';
+require_once dirname( __DIR__ ) . '/includes/import/class-oli-cf-import-registry.php';
+require_once dirname( __DIR__ ) . '/includes/class-oli-cf-upgrade.php';
 require_once dirname( __DIR__ ) . '/admin/class-oli-cf-importer.php';
 require_once dirname( __DIR__ ) . '/admin/class-oli-cf-settings.php';
 require_once dirname( __DIR__ ) . '/public/class-oli-cf-public.php';

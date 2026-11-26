@@ -308,10 +308,10 @@ class Oli_CF_Submission {
 			);
 		}
 
-		$template = get_post_meta( $form_id, '_oli_cf_form_template', true );
+		$fields   = Oli_CF_Fields::for_form( $form_id );
 		$messages = Oli_CF_Validator::normalize_messages( get_post_meta( $form_id, '_oli_cf_messages', true ) );
 
-		if ( empty( $template ) ) {
+		if ( empty( $fields ) ) {
 			return array(
 				'success' => false,
 				'status'  => 'mail_failed',
@@ -319,8 +319,7 @@ class Oli_CF_Submission {
 			);
 		}
 
-		$data   = $this->sanitize_posted_data( $post );
-		$fields = Oli_CF_Form_Parser::parse_fields( $template );
+		$data = $this->sanitize_posted_data( $post );
 
 		/**
 		 * Fires before validation.
@@ -351,7 +350,7 @@ class Oli_CF_Submission {
 			);
 		}
 
-		$validation = Oli_CF_Validator::validate( $data, $template, $files, $messages );
+		$validation = Oli_CF_Validator::validate( $data, $fields, $files, $messages );
 
 		if ( is_array( $validation ) ) {
 			return array(
@@ -413,7 +412,7 @@ class Oli_CF_Submission {
 			return array(
 				'success' => false,
 				'status'  => 'mail_failed',
-				'message' => $messages['mail_sent_ng'],
+				'message' => $messages['send_error'],
 				'values'  => $data,
 			);
 		}
@@ -429,7 +428,7 @@ class Oli_CF_Submission {
 		return array(
 			'success' => true,
 			'status'  => 'success',
-			'message' => $messages['mail_sent_ok'],
+			'message' => $messages['success'],
 		);
 	}
 

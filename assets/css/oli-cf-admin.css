@@ -23,6 +23,24 @@
 	font-size: 13px;
 }
 
-.oli-cf-form-control-wrap {
+.oli-cf-control {
 	display: inline-block;
+}
+
+.oli-cf-repeater-row {
+	margin: 0 0 12px;
+	padding: 12px;
+	border: 1px solid #dcdcde;
+	background: #fff;
+}
+
+.oli-cf-repeater-row label {
+	display: inline-block;
+	margin: 0 12px 8px 0;
+}
+
+.oli-cf-repeater-row textarea.large-text,
+.oli-cf-repeater-row input.large-text {
+	width: 100%;
+	max-width: 40rem;
 }

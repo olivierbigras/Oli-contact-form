@@ -302,7 +302,7 @@ class Oli_CF_Public {
 
 		$settings = get_option( 'oli_cf_settings', array() );
 
-		if ( ! empty( $settings['cf7_compat_enabled'] ) && has_shortcode( $content, 'contact-form-7' ) ) {
+		if ( ! empty( $settings['legacy_shortcode_compat'] ) && has_shortcode( $content, 'contact-form-7' ) ) {
 			return true;
 		}
 

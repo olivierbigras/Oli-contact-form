@@ -1,6 +1,6 @@
 <?php
 /**
- * Import Contact Form 7 forms.
+ * Import existing forms into the field builder.
  *
  * @package Oli_Contact_Form
  */
@@ -10,31 +10,69 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Importer class.
+ * Import screen: preview, then create drafts.
  */
 class Oli_CF_Importer {
 
 	/**
-	 * Add importer page to admin menu.
+	 * Page slug.
+	 *
+	 * @var string
+	 */
+	const PAGE = 'oli-cf-import';
+
+	/**
+	 * Add the import page.
 	 */
 	public function add_importer_page() {
 		add_submenu_page(
 			'edit.php?post_type=oli_contact_form',
-			__( 'Import from CF7', 'oli-contact-form' ),
-			__( 'Import from CF7', 'oli-contact-form' ),
+			__( 'Import existing forms', 'oli-contact-form' ),
+			__( 'Import', 'oli-contact-form' ),
 			'manage_options',
-			'oli-cf-import-cf7',
-			array( $this, 'render_importer_page' )
+			self::PAGE,
+			array( $this, 'render_page' )
 		);
 	}
 
 	/**
-	 * Enqueue the importer "select all" script on the CF7 import screen.
+	 * Send a bookmarked old address to the new page.
+	 */
+	public function redirect_legacy_page() {
+		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$page   = sanitize_key( (string) filter_input( INPUT_GET, 'page' ) );
+		$legacy = Oli_CF_Import_Registry::legacy_page_slug();
+
+		if ( '' === $legacy || $page !== $legacy ) {
+			return;
+		}
+
+		wp_safe_redirect( admin_url( 'edit.php?post_type=oli_contact_form&page=' . self::PAGE ) );
+		exit;
+	}
+
+	/**
+	 * An old form post no longer imports. It opens the new screen instead.
+	 */
+	public function handle_legacy_action() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'oli-contact-form' ) );
+		}
+
+		wp_safe_redirect( admin_url( 'edit.php?post_type=oli_contact_form&page=' . self::PAGE ) );
+		exit;
+	}
+
+	/**
+	 * Scripts for the form list.
 	 *
-	 * @param string $hook Current admin page hook.
+	 * @param string $hook Current admin hook.
 	 */
 	public function enqueue_scripts( $hook ) {
-		if ( false === strpos( $hook, 'oli-cf-import-cf7' ) ) {
+		if ( false === strpos( (string) $hook, self::PAGE ) ) {
 			return;
 		}
 
@@ -48,416 +86,350 @@ class Oli_CF_Importer {
 	}
 
 	/**
-	 * Render importer page.
+	 * Render the import screen.
 	 */
-	public function render_importer_page() {
+	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
-		$cf7_forms = $this->get_cf7_forms();
+		$step    = sanitize_key( (string) filter_input( INPUT_GET, 'step' ) );
+		$token   = sanitize_key( (string) filter_input( INPUT_GET, 'token' ) );
+		$preview = ( 'preview' === $step ) ? $this->preview_payload( $token ) : array();
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'Import from Contact Form 7', 'oli-contact-form' ); ?></h1>
-
-			<?php if ( empty( $cf7_forms ) ) : ?>
-				<div class="notice notice-warning">
-					<p><?php esc_html_e( 'No Contact Form 7 forms found. Please make sure Contact Form 7 is installed and you have created some forms.', 'oli-contact-form' ); ?></p>
-				</div>
+			<h1><?php esc_html_e( 'Import existing forms', 'oli-contact-form' ); ?></h1>
+			<?php if ( ! empty( $preview ) ) : ?>
+				<?php $this->render_preview( $token, $preview ); ?>
 			<?php else : ?>
-				<p><?php esc_html_e( 'This tool will import Contact Form 7 forms into Oli Contact Form. Form tags, mail settings, and messages will be converted.', 'oli-contact-form' ); ?></p>
-
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'oli_cf_import_cf7', 'oli_cf_import_nonce' ); ?>
-					<input type="hidden" name="action" value="oli_cf_import_cf7" />
-
-					<table class="wp-list-table widefat fixed striped">
-						<thead>
-							<tr>
-								<th class="check-column"><input type="checkbox" id="oli-cf-select-all" /></th>
-								<th><?php esc_html_e( 'Form Title', 'oli-contact-form' ); ?></th>
-								<th><?php esc_html_e( 'ID', 'oli-contact-form' ); ?></th>
-							</tr>
-						</thead>
-						<tbody>
-							<?php foreach ( $cf7_forms as $form ) : ?>
-								<tr>
-									<td class="check-column">
-										<input type="checkbox" name="import_forms[]" value="<?php echo esc_attr( (string) absint( $form->ID ) ); ?>" class="oli-cf-import-checkbox" />
-									</td>
-									<td><?php echo esc_html( $form->post_title ); ?></td>
-									<td><?php echo esc_html( (string) absint( $form->ID ) ); ?></td>
-								</tr>
-							<?php endforeach; ?>
-						</tbody>
-					</table>
-
-					<p>
-						<?php submit_button( __( 'Import Selected Forms', 'oli-contact-form' ), 'primary', 'submit', false ); ?>
-					</p>
-				</form>
+				<?php $this->render_picker(); ?>
 			<?php endif; ?>
 		</div>
 		<?php
 	}
 
 	/**
-	 * Handle import.
+	 * Source and form picker.
 	 */
-	public function handle_import() {
+	private function render_picker() {
+		$sources = Oli_CF_Import_Registry::available();
+
+		if ( empty( $sources ) ) {
+			echo '<p>' . esc_html__( 'No existing forms were found.', 'oli-contact-form' ) . '</p>';
+			return;
+		}
+
+		$selected = sanitize_key( (string) filter_input( INPUT_GET, 'source' ) );
+
+		if ( '' === $selected ) {
+			$selected = $sources[0]->key();
+		}
+		$source = Oli_CF_Import_Registry::get( $selected );
+
+		if ( ! $source || ! $source->is_available() ) {
+			$source = $sources[0];
+		}
+		?>
+		<p><?php esc_html_e( 'Choose a source, review the fields that cannot be converted, then import the forms you want as drafts.', 'oli-contact-form' ); ?></p>
+		<ul class="subsubsub">
+			<?php foreach ( $sources as $index => $item ) : ?>
+				<?php
+				$source_url = add_query_arg(
+					array(
+						'post_type' => 'oli_contact_form',
+						'page'      => self::PAGE,
+						'source'    => $item->key(),
+					),
+					admin_url( 'edit.php' )
+				);
+				?>
+				<li>
+					<a href="<?php echo esc_url( $source_url ); ?>" <?php echo $item->key() === $source->key() ? 'class="current" aria-current="page"' : ''; ?>>
+						<?php echo esc_html( $item->label() ); ?>
+					</a>
+					<?php echo ( $index < count( $sources ) - 1 ) ? ' | ' : ''; ?>
+				</li>
+			<?php endforeach; ?>
+		</ul>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'oli_cf_import_preview', 'oli_cf_import_nonce' ); ?>
+			<input type="hidden" name="action" value="oli_cf_import_preview" />
+			<input type="hidden" name="oli_cf_source" value="<?php echo esc_attr( $source->key() ); ?>" />
+			<?php $forms = $source->list_forms(); ?>
+			<?php if ( empty( $forms ) ) : ?>
+				<p><?php esc_html_e( 'This source has no forms to import.', 'oli-contact-form' ); ?></p>
+			<?php else : ?>
+				<table class="widefat striped">
+					<thead>
+						<tr>
+							<td class="check-column"><input type="checkbox" id="oli-cf-import-all" /></td>
+							<th><?php esc_html_e( 'Form', 'oli-contact-form' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $forms as $form ) : ?>
+							<tr>
+								<th class="check-column">
+									<input type="checkbox" name="import_forms[]" value="<?php echo esc_attr( $form['id'] ); ?>" class="oli-cf-import-checkbox" />
+								</th>
+								<td><?php echo esc_html( $form['title'] ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+				<p><?php submit_button( __( 'Preview selected forms', 'oli-contact-form' ), 'primary', 'submit', false ); ?></p>
+			<?php endif; ?>
+		</form>
+		<?php
+	}
+
+	/**
+	 * Preview of the forms about to be imported.
+	 *
+	 * @param string               $token   Preview token.
+	 * @param array<string, mixed> $payload Stored preview.
+	 */
+	private function render_preview( $token, $payload ) {
+		$items = isset( $payload['items'] ) && is_array( $payload['items'] ) ? $payload['items'] : array();
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'oli_cf_import_run', 'oli_cf_import_nonce' ); ?>
+			<input type="hidden" name="action" value="oli_cf_import_run" />
+			<input type="hidden" name="oli_cf_import_token" value="<?php echo esc_attr( $token ); ?>" />
+			<?php foreach ( $items as $item ) : ?>
+				<h2><?php echo esc_html( isset( $item['title'] ) ? (string) $item['title'] : '' ); ?></h2>
+				<?php $unsupported = isset( $item['unsupported'] ) && is_array( $item['unsupported'] ) ? $item['unsupported'] : array(); ?>
+				<?php if ( empty( $unsupported ) ) : ?>
+					<p><?php esc_html_e( 'Every field can be imported.', 'oli-contact-form' ); ?></p>
+				<?php else : ?>
+					<p><?php esc_html_e( 'These fields will be left out:', 'oli-contact-form' ); ?></p>
+					<ul>
+						<?php foreach ( $unsupported as $field ) : ?>
+							<li><?php echo esc_html( trim( ( isset( $field['label'] ) ? (string) $field['label'] : '' ) . ' (' . ( isset( $field['type'] ) ? (string) $field['type'] : '' ) . ')' ) ); ?></li>
+						<?php endforeach; ?>
+					</ul>
+				<?php endif; ?>
+			<?php endforeach; ?>
+			<p><?php submit_button( __( 'Import as drafts', 'oli-contact-form' ), 'primary', 'submit', false ); ?></p>
+		</form>
+		<?php
+	}
+
+	/**
+	 * Store a preview and open it.
+	 */
+	public function handle_preview() {
+		if ( ! isset( $_POST['oli_cf_import_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['oli_cf_import_nonce'] ) ), 'oli_cf_import_preview' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'oli-contact-form' ) );
+		}
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'You do not have permission to perform this action.', 'oli-contact-form' ) );
 		}
 
-		if ( ! isset( $_POST['oli_cf_import_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['oli_cf_import_nonce'] ) ), 'oli_cf_import_cf7' ) ) {
-			wp_die( esc_html__( 'Security check failed.', 'oli-contact-form' ) );
+		$source_key = isset( $_POST['oli_cf_source'] ) ? sanitize_key( wp_unslash( $_POST['oli_cf_source'] ) ) : '';
+		$source     = Oli_CF_Import_Registry::get( $source_key );
+		$ids        = isset( $_POST['import_forms'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['import_forms'] ) ) : array();
+		$items      = array();
+
+		if ( $source && is_array( $ids ) ) {
+			foreach ( $ids as $id ) {
+				$converted = $source->convert( $id );
+
+				if ( is_array( $converted ) ) {
+					$items[] = $converted;
+				}
+			}
 		}
 
-		$form_ids = isset( $_POST['import_forms'] ) ? array_map( 'absint', wp_unslash( $_POST['import_forms'] ) ) : array();
-
-		if ( empty( $form_ids ) ) {
+		if ( empty( $items ) ) {
 			wp_safe_redirect(
 				add_query_arg(
 					array(
+						'post_type'             => 'oli_contact_form',
+						'page'                  => self::PAGE,
 						'oli_cf_imported'       => 0,
 						'oli_cf_imported_nonce' => wp_create_nonce( 'oli_cf_imported' ),
 					),
-					admin_url( 'edit.php?post_type=oli_contact_form&page=oli-cf-import-cf7' )
+					admin_url( 'edit.php' )
 				)
 			);
 			exit;
 		}
 
-		$imported_count = 0;
-
-		foreach ( $form_ids as $form_id ) {
-			if ( $this->import_cf7_form( $form_id ) ) {
-				++$imported_count;
-			}
-		}
+		$token = wp_generate_password( 20, false );
+		set_transient(
+			$this->transient_key(),
+			array(
+				'token'  => $token,
+				'source' => $source_key,
+				'items'  => $items,
+			),
+			15 * MINUTE_IN_SECONDS
+		);
 
 		wp_safe_redirect(
 			add_query_arg(
 				array(
-					'oli_cf_imported'       => $imported_count,
-					'oli_cf_imported_nonce' => wp_create_nonce( 'oli_cf_imported' ),
+					'post_type' => 'oli_contact_form',
+					'page'      => self::PAGE,
+					'step'      => 'preview',
+					'token'     => $token,
 				),
-				admin_url( 'edit.php?post_type=oli_contact_form' )
+				admin_url( 'edit.php' )
 			)
 		);
 		exit;
 	}
 
 	/**
-	 * Get CF7 forms.
-	 *
-	 * @return WP_Post[]
+	 * Create drafts from the stored preview.
 	 */
-	private function get_cf7_forms() {
-		return get_posts(
-			array(
-				'post_type'      => 'wpcf7_contact_form',
-				'posts_per_page' => -1,
-				'post_status'    => 'publish',
-			)
-		);
-	}
-
-	/**
-	 * Import a single CF7 form.
-	 *
-	 * @param int $cf7_form_id CF7 form ID.
-	 * @return bool True on success, false on failure.
-	 */
-	private function import_cf7_form( $cf7_form_id ) {
-		$cf7_form = get_post( $cf7_form_id );
-
-		if ( ! $cf7_form || 'wpcf7_contact_form' !== $cf7_form->post_type ) {
-			return false;
+	public function handle_run() {
+		if ( ! isset( $_POST['oli_cf_import_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['oli_cf_import_nonce'] ) ), 'oli_cf_import_run' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'oli-contact-form' ) );
 		}
 
-		$new_form_id = wp_insert_post(
-			array(
-				'post_title'  => $cf7_form->post_title,
-				'post_type'   => 'oli_contact_form',
-				'post_status' => 'publish',
-			)
-		);
-
-		if ( is_wp_error( $new_form_id ) || ! $new_form_id ) {
-			return false;
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'oli-contact-form' ) );
 		}
 
-		$cf7_form_data = get_post_meta( $cf7_form_id, '_form', true );
-		$cf7_mail      = get_post_meta( $cf7_form_id, '_mail', true );
-		$cf7_mail_2    = get_post_meta( $cf7_form_id, '_mail_2', true );
-		$cf7_messages  = get_post_meta( $cf7_form_id, '_messages', true );
+		$token   = isset( $_POST['oli_cf_import_token'] ) ? sanitize_key( wp_unslash( $_POST['oli_cf_import_token'] ) ) : '';
+		$payload = $this->preview_payload( $token );
+		$count   = 0;
+		$skipped = 0;
 
-		update_post_meta( $new_form_id, '_oli_cf_form_template', self::convert_template( $cf7_form_data ) );
-		update_post_meta( $new_form_id, '_oli_cf_mail', self::convert_mail( $cf7_mail, false ) );
-		update_post_meta( $new_form_id, '_oli_cf_mail_2', self::convert_mail( $cf7_mail_2, true ) );
-		update_post_meta( $new_form_id, '_oli_cf_messages', self::convert_messages( $cf7_messages ) );
-		update_post_meta( $new_form_id, '_oli_cf_imported_from_cf7', absint( $cf7_form_id ) );
+		if ( ! empty( $payload['items'] ) && is_array( $payload['items'] ) ) {
+			$source = Oli_CF_Import_Registry::get( isset( $payload['source'] ) ? (string) $payload['source'] : '' );
 
-		return true;
-	}
-
-	/**
-	 * Convert a CF7 form template to Oli Contact Form tags.
-	 *
-	 * @param string $cf7_template CF7 template.
-	 * @return string
-	 */
-	public static function convert_template( $cf7_template ) {
-		$template = Oli_CF_Form_Parser::normalize_template( $cf7_template );
-
-		$template = preg_replace_callback(
-			'/\[([^\]]+)\]/',
-			function ( $matches ) {
-				$converted = self::convert_form_tag( $matches[1] );
-
-				if ( '' === $converted ) {
-					return '';
-				}
-
-				return '[' . $converted . ']';
-			},
-			$template
-		);
-
-		return is_string( $template ) ? $template : '';
-	}
-
-	/**
-	 * Convert one CF7 form tag (without brackets).
-	 *
-	 * @param string $tag Tag content.
-	 * @return string
-	 */
-	public static function convert_form_tag( $tag ) {
-		$tokens = Oli_CF_Form_Parser::tokenize( $tag );
-
-		if ( empty( $tokens ) ) {
-			return $tag;
-		}
-
-		$type_raw = $tokens[0];
-		$star     = ( substr( $type_raw, -1 ) === '*' );
-		$type     = strtolower( rtrim( $type_raw, '*' ) );
-
-		if ( '' !== $type && '/' === $type[0] ) {
-			return '';
-		}
-
-		$map = array(
-			'text'       => 'text',
-			'email'      => 'email',
-			'tel'        => 'tel',
-			'tel*'       => 'tel',
-			'phone'      => 'tel',
-			'url'        => 'url',
-			'number'     => 'number',
-			'date'       => 'date',
-			'textarea'   => 'textarea',
-			'select'     => 'select',
-			'checkbox'   => 'checkbox',
-			'radio'      => 'radio',
-			'acceptance' => 'acceptance',
-			'file'       => 'file',
-			'submit'     => 'submit',
-			'captcha'    => '',
-			'recaptcha'  => '',
-			'quiz'       => '',
-			'response'   => '',
-		);
-
-		if ( ! isset( $map[ $type ] ) ) {
-			return $tag;
-		}
-
-		if ( '' === $map[ $type ] ) {
-			return '';
-		}
-
-		$tokens[0] = $map[ $type ] . ( $star ? '*' : '' );
-		$out       = array();
-		$has_name  = ( 'submit' !== $map[ $type ] );
-
-		foreach ( $tokens as $index => $token ) {
-			if ( '' === $token ) {
-				continue;
-			}
-
-			if ( 0 === strpos( $token, 'akismet:' ) ) {
-				continue;
-			}
-
-			if ( 0 === strpos( $token, 'watermark:' ) ) {
-				$token = 'placeholder:' . substr( $token, 10 );
-			}
-
-			if ( 0 === $index ) {
-				$out[] = $token;
-				continue;
-			}
-
-			if ( $has_name && false === strpos( $token, ':' ) ) {
-				$out[]    = $token;
-				$has_name = false;
-				continue;
-			}
-
-			if ( 'optional' === strtolower( $token ) ) {
-				$out[] = 'optional';
-				continue;
-			}
-
-			if ( preg_match( '/^([a-z0-9_-]+):(.*)$/i', $token, $attr ) ) {
-				$key = strtolower( $attr[1] );
-				$val = $attr[2];
-
-				if ( 'file' === $map[ $type ] && 'filetypes' === $key ) {
-					$val = self::normalize_filetypes( $val );
-
-					if ( '' === $val ) {
-						continue;
-					}
-				}
-
-				$out[] = $key . ':' . $val;
-				continue;
-			}
-
-			$out[] = '"' . $token . '"';
-		}
-
-		return implode( ' ', $out );
-	}
-
-	/**
-	 * Normalize a CF7 filetypes option to pipe-separated extensions.
-	 *
-	 * @param string $filetypes Raw filetypes value.
-	 * @return string
-	 */
-	public static function normalize_filetypes( $filetypes ) {
-		$filetypes = strtolower( trim( (string) $filetypes ) );
-
-		$aliases = array(
-			'image/*' => 'jpg|jpeg|png|gif|webp',
-			'audio/*' => 'mp3|wav|ogg|m4a',
-			'video/*' => 'mp4|mov|avi|mpg|wmv',
-		);
-
-		foreach ( $aliases as $alias => $exts ) {
-			$filetypes = str_replace( $alias, $exts, $filetypes );
-		}
-
-		$parts = preg_split( '/[|,;\s]+/', $filetypes );
-		$clean = array();
-
-		if ( is_array( $parts ) ) {
-			foreach ( $parts as $part ) {
-				$part = ltrim( trim( $part ), '.' );
-				$part = preg_replace( '/[^a-z0-9]/', '', $part );
-
-				if ( '' === $part || in_array( $part, Oli_CF_Uploads::BLOCKED_EXTENSIONS, true ) ) {
+			foreach ( $payload['items'] as $item ) {
+				if ( ! is_array( $item ) || ! $source ) {
 					continue;
 				}
 
-				$clean[] = $part;
+				if ( $this->already_imported( $source->key(), isset( $item['source_id'] ) ? (string) $item['source_id'] : '' ) ) {
+					++$skipped;
+					continue;
+				}
+
+				if ( $this->insert_draft( $source->key(), $item ) ) {
+					++$count;
+				}
 			}
+
+			delete_transient( $this->transient_key() );
 		}
 
-		return implode( '|', array_values( array_unique( $clean ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'post_type'             => 'oli_contact_form',
+					'oli_cf_imported'       => (int) $count,
+					'oli_cf_import_skipped' => (int) $skipped,
+					'oli_cf_imported_nonce' => wp_create_nonce( 'oli_cf_imported' ),
+				),
+				admin_url( 'edit.php' )
+			)
+		);
+		exit;
 	}
 
 	/**
-	 * Convert CF7 mail settings.
+	 * Preview stored for the current user.
 	 *
-	 * @param mixed $cf7_mail CF7 mail settings.
-	 * @param bool  $is_mail_2 Is this mail 2.
+	 * @param string $token Token from the URL.
 	 * @return array<string, mixed>
 	 */
-	public static function convert_mail( $cf7_mail, $is_mail_2 = false ) {
-		$empty = array(
-			'to'                 => $is_mail_2 ? '' : ( function_exists( 'get_option' ) ? get_option( 'admin_email' ) : '' ),
-			'from'               => '',
-			'subject'            => '',
-			'body'               => '',
-			'reply_to'           => '',
-			'additional_headers' => '',
-		);
+	private function preview_payload( $token ) {
+		$stored = get_transient( $this->transient_key() );
 
-		if ( $is_mail_2 ) {
-			$empty['enabled'] = false;
+		if ( ! is_array( $stored ) || ! isset( $stored['token'] ) || ! hash_equals( (string) $stored['token'], (string) $token ) ) {
+			return array();
 		}
 
-		if ( ! is_array( $cf7_mail ) || empty( $cf7_mail ) ) {
-			return $empty;
-		}
-
-		$headers = isset( $cf7_mail['additional_headers'] ) ? (string) $cf7_mail['additional_headers'] : '';
-		$reply   = '';
-
-		if ( preg_match( '/^Reply-To:\s*(.+)$/mi', $headers, $matches ) ) {
-			$reply   = trim( $matches[1] );
-			$headers = trim( preg_replace( '/^Reply-To:\s*.+$/mi', '', $headers ) );
-		}
-
-		$mail = array(
-			'to'                 => isset( $cf7_mail['recipient'] ) ? (string) $cf7_mail['recipient'] : $empty['to'],
-			'from'               => isset( $cf7_mail['sender'] ) ? (string) $cf7_mail['sender'] : '',
-			'subject'            => isset( $cf7_mail['subject'] ) ? (string) $cf7_mail['subject'] : '',
-			'body'               => isset( $cf7_mail['body'] ) ? (string) $cf7_mail['body'] : '',
-			'reply_to'           => $reply,
-			'additional_headers' => $headers,
-		);
-
-		if ( $is_mail_2 ) {
-			$mail['enabled'] = ! empty( $cf7_mail['active'] );
-		}
-
-		return $mail;
+		return $stored;
 	}
 
 	/**
-	 * Convert CF7 messages.
+	 * Transient name for the current user.
 	 *
-	 * @param mixed $cf7_messages CF7 messages.
-	 * @return array<string, string>
+	 * @return string
 	 */
-	public static function convert_messages( $cf7_messages ) {
-		$defaults = Oli_CF_Validator::default_messages();
+	private function transient_key() {
+		$user_id = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
 
-		if ( ! is_array( $cf7_messages ) ) {
-			return $defaults;
+		return 'oli_cf_import_' . $user_id;
+	}
+
+	/**
+	 * Whether this source form was already imported.
+	 *
+	 * @param string $source_key Source key.
+	 * @param string $source_id  Source form ID.
+	 * @return bool
+	 */
+	private function already_imported( $source_key, $source_id ) {
+		if ( '' === $source_id || ! function_exists( 'get_posts' ) ) {
+			return false;
 		}
 
-		$map = array(
-			'mail_sent_ok'             => 'mail_sent_ok',
-			'mail_sent_ng'             => 'mail_sent_ng',
-			'validation_error'         => 'validation_error',
-			'invalid_required'         => 'invalid_required',
-			'invalid_email'            => 'invalid_email',
-			'invalid_tel'              => 'invalid_tel',
-			'invalid_url'              => 'invalid_url',
-			'invalid_number'           => 'invalid_number',
-			'invalid_date'             => 'invalid_date',
-			'invalid_too_long'         => 'invalid_too_long',
-			'invalid_too_short'        => 'invalid_too_short',
-			'accept_terms'             => 'accept_terms',
-			'upload_failed'            => 'upload_failed',
-			'upload_file_type_invalid' => 'upload_file_type',
-			'upload_file_too_large'    => 'upload_file_too_large',
+		$existing = get_posts(
+			array(
+				'post_type'      => 'oli_contact_form',
+				'post_status'    => 'any',
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- duplicate check before creating an imported draft.
+				'meta_query'     => array(
+					'relation' => 'AND',
+					array(
+						'key'   => '_oli_cf_imported_from',
+						'value' => $source_key,
+					),
+					array(
+						'key'   => '_oli_cf_import_source_id',
+						'value' => $source_id,
+					),
+				),
+			)
 		);
 
-		foreach ( $map as $cf7_key => $oli_key ) {
-			if ( isset( $cf7_messages[ $cf7_key ] ) && is_string( $cf7_messages[ $cf7_key ] ) && '' !== trim( $cf7_messages[ $cf7_key ] ) ) {
-				$defaults[ $oli_key ] = $cf7_messages[ $cf7_key ];
-			}
+		return ! empty( $existing );
+	}
+
+	/**
+	 * Insert one draft. The source record is not modified.
+	 *
+	 * @param string               $source_key Source key.
+	 * @param array<string, mixed> $item       Converted form.
+	 * @return bool
+	 */
+	private function insert_draft( $source_key, $item ) {
+		if ( ! function_exists( 'wp_insert_post' ) ) {
+			return false;
 		}
 
-		return $defaults;
+		$title   = isset( $item['title'] ) ? (string) $item['title'] : __( 'Imported form', 'oli-contact-form' );
+		$post_id = wp_insert_post(
+			array(
+				'post_type'   => 'oli_contact_form',
+				'post_status' => 'draft',
+				'post_title'  => $title,
+			),
+			true
+		);
+
+		if ( is_wp_error( $post_id ) || ! $post_id ) {
+			return false;
+		}
+
+		update_post_meta( $post_id, Oli_CF_Fields::META, Oli_CF_Fields::encode( isset( $item['fields'] ) ? $item['fields'] : array() ) );
+		update_post_meta( $post_id, Oli_CF_Notifications::META, Oli_CF_Notifications::encode( isset( $item['notifications'] ) ? $item['notifications'] : array() ) );
+		update_post_meta( $post_id, '_oli_cf_messages', Oli_CF_Validator::normalize_messages( isset( $item['messages'] ) ? $item['messages'] : array() ) );
+		update_post_meta( $post_id, '_oli_cf_schema', Oli_CF_Fields::SCHEMA );
+		update_post_meta( $post_id, '_oli_cf_imported_from', $source_key );
+		update_post_meta( $post_id, '_oli_cf_import_source_id', isset( $item['source_id'] ) ? (string) $item['source_id'] : '' );
+
+		return true;
 	}
 }

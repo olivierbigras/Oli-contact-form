@@ -23,34 +23,45 @@ class Oli_CF_Mailer {
 	 * @return bool True on success, false on failure.
 	 */
 	public static function send( $form_id, $data, $attachments = array() ) {
-		$mail_settings   = get_post_meta( $form_id, '_oli_cf_mail', true );
-		$mail_2_settings = get_post_meta( $form_id, '_oli_cf_mail_2', true );
+		$notifications = Oli_CF_Notifications::for_form( $form_id );
+		$primary       = true;
+		$sent          = false;
 
-		if ( empty( $mail_settings ) || ! is_array( $mail_settings ) ) {
-			return false;
+		if ( ! is_array( $data ) ) {
+			$data = array();
 		}
 
-		$mail_settings   = self::normalize_mail( $mail_settings );
-		$mail_2_settings = self::normalize_mail( $mail_2_settings, true );
+		foreach ( $notifications as $notification ) {
+			if ( empty( $notification['enabled'] ) || ! Oli_CF_Notifications::condition_matches( $notification, $data ) ) {
+				continue;
+			}
 
-		$main       = self::build_mail( $mail_settings, $data, $attachments );
-		$main['to'] = self::resolve_recipient( $main['to'] );
+			$settings = Oli_CF_Notifications::to_mail_settings( $notification );
+			$mail     = self::build_mail( $settings, $data, $primary ? $attachments : array() );
 
-		if ( empty( $main['to'] ) ) {
-			return false;
-		}
+			if ( $primary ) {
+				$mail['to'] = self::resolve_recipient( $mail['to'] );
 
-		$result = wp_mail( $main['to'], $main['subject'], $main['body'], $main['headers'], $main['attachments'] );
+				if ( '' === $mail['to'] ) {
+					return false;
+				}
 
-		if ( is_array( $mail_2_settings ) && ! empty( $mail_2_settings['enabled'] ) ) {
-			$mail_2 = self::build_mail( $mail_2_settings, $data, array() );
+				$sent = (bool) wp_mail( $mail['to'], $mail['subject'], $mail['body'], $mail['headers'], $mail['attachments'] );
 
-			if ( ! empty( $mail_2['to'] ) ) {
-				wp_mail( $mail_2['to'], $mail_2['subject'], $mail_2['body'], $mail_2['headers'], $mail_2['attachments'] );
+				if ( ! $sent ) {
+					return false;
+				}
+
+				$primary = false;
+				continue;
+			}
+
+			if ( '' !== $mail['to'] && self::recipient_is_valid( $mail['to'] ) ) {
+				wp_mail( $mail['to'], $mail['subject'], $mail['body'], $mail['headers'], $mail['attachments'] );
 			}
 		}
 
-		return (bool) $result;
+		return $sent;
 	}
 
 	/**
@@ -62,29 +73,29 @@ class Oli_CF_Mailer {
 		return array(
 			'to'                 => (string) get_option( 'admin_email' ),
 			'from'               => (string) get_option( 'admin_email' ),
-			'subject'            => __( 'New message from [your-name]', 'oli-contact-form' ),
+			'subject'            => __( 'New message from {field:name}', 'oli-contact-form' ),
 			'body'               => sprintf(
-				/* translators: 1: [your-name] tag, 2: [your-email] tag, 3: [your-subject] tag, 4: [your-message] tag. */
+				/* translators: 1: name token, 2: email token, 3: subject token, 4: message token. */
 				__( "From: %1\$s <%2\$s>\nSubject: %3\$s\n\nMessage:\n%4\$s", 'oli-contact-form' ),
-				'[your-name]',
-				'[your-email]',
-				'[your-subject]',
-				'[your-message]'
+				'{field:name}',
+				'{field:email}',
+				'{field:subject}',
+				'{field:message}'
 			),
-			'reply_to'           => '[your-email]',
+			'reply_to'           => '{field:email}',
 			'additional_headers' => '',
 		);
 	}
 
 	/**
-	 * Default confirmation (Mail 2) settings.
+	 * Default sender confirmation, used when an older second mail box is read.
 	 *
 	 * @return array<string, mixed>
 	 */
 	public static function default_mail_2() {
 		return array(
 			'enabled'            => false,
-			'to'                 => '[your-email]',
+			'to'                 => '{field:email}',
 			'from'               => (string) get_option( 'admin_email' ),
 			'subject'            => __( 'Thank you for your message', 'oli-contact-form' ),
 			'body'               => __( "Thank you for contacting us.\n\nWe will get back to you soon.", 'oli-contact-form' ),
@@ -187,7 +198,7 @@ class Oli_CF_Mailer {
 	}
 
 	/**
-	 * Strip executable HTML but keep <[field-tag]> and <user@example.com>.
+	 * Strip executable HTML but keep <{field:name}> and <user@example.com>.
 	 *
 	 * @param mixed $value          Raw value.
 	 * @param bool  $allow_newlines Whether to keep newlines.
@@ -198,7 +209,7 @@ class Oli_CF_Mailer {
 
 		$tokens = array();
 		$value  = preg_replace_callback(
-			'/<(\[[a-zA-Z0-9._-]+\]|[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})>/',
+			'/<(\{[a-zA-Z0-9:_-]+\}|\[[a-zA-Z0-9._-]+\]|[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})>/',
 			function ( $matches ) use ( &$tokens ) {
 				$key            = "\x01OLI" . count( $tokens ) . "\x01";
 				$tokens[ $key ] = '<' . $matches[1] . '>';
@@ -309,9 +320,9 @@ class Oli_CF_Mailer {
 	}
 
 	/**
-	 * Replace [field] tags with submitted values or CF7 special mail-tags.
+	 * Replace {field:name} and {site:title} tokens.
 	 *
-	 * @param string               $text Text with tags.
+	 * @param string               $text Text with tokens.
 	 * @param array<string, mixed> $data Posted data.
 	 * @return string
 	 */
@@ -322,13 +333,18 @@ class Oli_CF_Mailer {
 			$data = array();
 		}
 
-		return preg_replace_callback(
-			'/\[([^\]]+)\]/',
+		$replaced = preg_replace_callback(
+			'/\{([a-z_]+):([a-z0-9_-]+)\}/i',
 			function ( $matches ) use ( $data ) {
-				$field_name = trim( $matches[1] );
+				$namespace = strtolower( $matches[1] );
+				$name      = strtolower( $matches[2] );
 
-				if ( isset( $data[ $field_name ] ) ) {
-					$value = $data[ $field_name ];
+				if ( 'field' === $namespace ) {
+					if ( ! isset( $data[ $name ] ) ) {
+						return '';
+					}
+
+					$value = $data[ $name ];
 
 					if ( is_array( $value ) ) {
 						$clean = array();
@@ -343,93 +359,100 @@ class Oli_CF_Mailer {
 					return sanitize_textarea_field( (string) $value );
 				}
 
-				$special = self::resolve_special_tag( $field_name );
+				$resolved = self::resolve_token( $namespace, $name );
 
-				if ( null !== $special ) {
-					return sanitize_textarea_field( $special );
+				if ( null === $resolved ) {
+					return '';
 				}
 
-				return '';
+				return sanitize_textarea_field( $resolved );
 			},
 			$text
 		);
+
+		return is_string( $replaced ) ? $replaced : $text;
 	}
 
 	/**
-	 * Resolve a Contact Form 7 special mail-tag.
+	 * Resolve a site, submission, post, or user token.
 	 *
-	 * Unknown tags return null so replace_tags can treat them as empty.
+	 * Unknown tokens return null so replace_tags can treat them as empty.
 	 *
-	 * @param string $tag Tag name without brackets (may include format:).
+	 * @param string $group Token group, such as site or field.
+	 * @param string $name  Token name.
 	 * @return string|null
 	 */
-	public static function resolve_special_tag( $tag ) {
-		$tag = trim( (string) $tag );
+	public static function resolve_token( $group, $name ) {
+		$group = strtolower( trim( (string) $group ) );
+		$name  = strtolower( trim( (string) $name ) );
 
-		if ( '' === $tag || '_' !== $tag[0] ) {
-			return null;
-		}
+		if ( 'site' === $group ) {
+			switch ( $name ) {
+				case 'admin_email':
+					return (string) get_option( 'admin_email' );
+				case 'title':
+					return self::site_info( 'name', 'blogname' );
+				case 'description':
+					return self::site_info( 'description', 'blogdescription' );
+				case 'url':
+					if ( function_exists( 'home_url' ) ) {
+						return home_url( '/' );
+					}
 
-		$tokens = preg_split( '/\s+/', $tag );
-		$name   = strtolower( (string) $tokens[0] );
-		$format = '';
-
-		foreach ( array_slice( (array) $tokens, 1 ) as $token ) {
-			if ( 0 === stripos( $token, 'format:' ) ) {
-				$format = substr( $token, 7 );
+					return self::site_info( 'url', 'home' );
 			}
 		}
 
-		switch ( $name ) {
-			case '_site_admin_email':
-				return (string) get_option( 'admin_email' );
-			case '_site_title':
-				return self::site_info( 'name', 'blogname' );
-			case '_site_description':
-				return self::site_info( 'description', 'blogdescription' );
-			case '_site_url':
-				if ( function_exists( 'home_url' ) ) {
-					return home_url( '/' );
-				}
-
-				return self::site_info( 'url', 'home' );
-			case '_remote_ip':
-				return self::request_ip();
-			case '_user_agent':
-				return self::request_user_agent();
-			case '_url':
-				return self::request_url();
-			case '_date':
-				return self::localized_datetime( '' !== $format ? $format : self::option_or( 'date_format', 'F j, Y' ) );
-			case '_time':
-				return self::localized_datetime( '' !== $format ? $format : self::option_or( 'time_format', 'g:i a' ) );
-			case '_post_id':
-				return function_exists( 'get_the_ID' ) ? (string) get_the_ID() : '';
-			case '_post_name':
-				return function_exists( 'get_post_field' ) ? (string) get_post_field( 'post_name' ) : '';
-			case '_post_title':
-				return function_exists( 'get_the_title' ) ? (string) get_the_title() : '';
-			case '_post_url':
-				return function_exists( 'get_permalink' ) ? (string) get_permalink() : '';
-			case '_post_author':
-				return self::current_post_author_field( 'display_name' );
-			case '_post_author_email':
-				return self::current_post_author_field( 'user_email' );
-			case '_user_login':
-				return self::current_user_field( 'user_login' );
-			case '_user_email':
-				return self::current_user_field( 'user_email' );
-			case '_user_display_name':
-				return self::current_user_field( 'display_name' );
-			case '_user_first_name':
-				return self::current_user_field( 'first_name' );
-			case '_user_last_name':
-				return self::current_user_field( 'last_name' );
-			case '_user_id':
-				return self::current_user_field( 'ID' );
-			default:
-				return null;
+		if ( 'submission' === $group ) {
+			switch ( $name ) {
+				case 'ip':
+					return self::request_ip();
+				case 'user_agent':
+					return self::request_user_agent();
+				case 'url':
+					return self::request_url();
+				case 'date':
+					return self::localized_datetime( self::option_or( 'date_format', 'F j, Y' ) );
+				case 'time':
+					return self::localized_datetime( self::option_or( 'time_format', 'g:i a' ) );
+			}
 		}
+
+		if ( 'post' === $group ) {
+			switch ( $name ) {
+				case 'id':
+					return function_exists( 'get_the_ID' ) ? (string) get_the_ID() : '';
+				case 'name':
+					return function_exists( 'get_post_field' ) ? (string) get_post_field( 'post_name' ) : '';
+				case 'title':
+					return function_exists( 'get_the_title' ) ? (string) get_the_title() : '';
+				case 'url':
+					return function_exists( 'get_permalink' ) ? (string) get_permalink() : '';
+				case 'author':
+					return self::current_post_author_field( 'display_name' );
+				case 'author_email':
+					return self::current_post_author_field( 'user_email' );
+			}
+		}
+
+		if ( 'user' === $group ) {
+			switch ( $name ) {
+				case 'login':
+					return self::current_user_field( 'user_login' );
+				case 'email':
+					return self::current_user_field( 'user_email' );
+				case 'display_name':
+					return self::current_user_field( 'display_name' );
+				case 'first_name':
+					return self::current_user_field( 'first_name' );
+				case 'last_name':
+					return self::current_user_field( 'last_name' );
+				case 'id':
+					return self::current_user_field( 'ID' );
+			}
+		}
+
+		return null;
 	}
 
 	/**

@@ -90,13 +90,13 @@
 		}
 
 		return {
-			invalid_required: parsed.invalid_required || defaults.invalidRequired || 'This field is required.',
-			invalid_email: parsed.invalid_email || defaults.invalidEmail || 'Please enter a valid email address.',
-			invalid_tel: parsed.invalid_tel || defaults.invalidTel || 'Please enter a valid phone number.',
-			invalid_url: parsed.invalid_url || defaults.invalidUrl || 'Please enter a valid URL.',
-			invalid_number: parsed.invalid_number || defaults.invalidNumber || 'Please enter a valid number.',
-			invalid_date: parsed.invalid_date || defaults.invalidDate || 'Please enter a valid date.',
-			accept_terms: parsed.accept_terms || defaults.acceptTerms || 'You must accept this to proceed.',
+			required: parsed.required || defaults.invalidRequired || 'This field is required.',
+			email: parsed.email || defaults.invalidEmail || 'Please enter a valid email address.',
+			phone: parsed.phone || defaults.invalidTel || 'Please enter a valid phone number.',
+			url: parsed.url || defaults.invalidUrl || 'Please enter a valid URL.',
+			number: parsed.number || defaults.invalidNumber || 'Please enter a valid number.',
+			date: parsed.date || defaults.invalidDate || 'Please enter a valid date.',
+			acceptance: parsed.acceptance || defaults.acceptTerms || 'You must accept this to proceed.',
 			validation_error: parsed.validation_error || defaults.validationError || 'One or more fields have an error. Please check and try again.'
 		};
 	}
@@ -299,7 +299,7 @@
 					$invalid.each(function() {
 						var $field = $(this);
 						var id = $field.attr('id') || '';
-						var err = $field.closest('.oli-cf-form-control-wrap').find('.oli-cf-field-error').text();
+						var err = $field.closest('.oli-cf-control').find('.oli-cf-field-error').text();
 						var label = fieldLabel($field);
 						var item = label ? (label + ' : ' + err) : err;
 						html += '<li>';
@@ -331,17 +331,17 @@
 			if ($field.is(':checkbox') && $field.hasClass('oli-cf-acceptance')) {
 				if (required && !$field.prop('checked')) {
 					isValid = false;
-					message = messages.accept_terms;
+					message = messages.acceptance;
 				}
 			} else if (required && $field.is(':checkbox')) {
 				var groupName = $field.attr('name');
 				if (groupName && !$formHasChecked($field.closest('.oli-cf-form'), groupName)) {
 					isValid = false;
-					message = messages.invalid_required;
+					message = messages.required;
 				}
 			} else if (required && (!value || String(value).length === 0)) {
 				isValid = false;
-				message = messages.invalid_required;
+				message = messages.required;
 			}
 
 			if (isValid && value && String(value).length > 0) {
@@ -349,31 +349,31 @@
 					case 'email':
 						if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
 							isValid = false;
-							message = messages.invalid_email;
+							message = messages.email;
 						}
 						break;
 					case 'url':
 						if (!/^https?:\/\/.+/.test(value)) {
 							isValid = false;
-							message = messages.invalid_url;
+							message = messages.url;
 						}
 						break;
 					case 'tel':
 						if (!/^[\d\s\+\-\(\)]+$/.test(value)) {
 							isValid = false;
-							message = messages.invalid_tel;
+							message = messages.phone;
 						}
 						break;
 					case 'number':
 						if (isNaN(value)) {
 							isValid = false;
-							message = messages.invalid_number;
+							message = messages.number;
 						}
 						break;
 					case 'date':
 						if (isNaN(Date.parse(value))) {
 							isValid = false;
-							message = messages.invalid_date;
+							message = messages.date;
 						}
 						break;
 				}
@@ -391,7 +391,7 @@
 			var id = 'oli-cf-err-' + name;
 			$field.addClass('oli-cf-invalid').attr('aria-invalid', 'true').attr('aria-describedby', id);
 
-			var $wrap = $field.closest('.oli-cf-form-control-wrap');
+			var $wrap = $field.closest('.oli-cf-control');
 			var $target = $wrap.length ? $wrap : $field.parent();
 			$target.find('.oli-cf-field-error').remove();
 			$target.append('<span class="oli-cf-field-error" id="' + id + '">' + escapeHtml(message) + '</span>');
@@ -399,7 +399,7 @@
 
 		clearFieldError: function($field) {
 			$field.removeClass('oli-cf-invalid').attr('aria-invalid', 'false').removeAttr('aria-describedby');
-			$field.closest('.oli-cf-form-control-wrap').find('.oli-cf-field-error').remove();
+			$field.closest('.oli-cf-control').find('.oli-cf-field-error').remove();
 		}
 	};
 
