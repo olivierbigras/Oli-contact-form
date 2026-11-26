@@ -22,6 +22,13 @@ class Oli_CF_Upgrade {
 	const ROUTINE_FIELDS = '0.4.0-fields';
 
 	/**
+	 * Routine that rewrites JSON damaged by wp_unslash() during the first conversion.
+	 *
+	 * @var string
+	 */
+	const ROUTINE_JSON = '0.4.0-json-slash';
+
+	/**
 	 * Option that stores which routines have finished.
 	 *
 	 * @var string
@@ -61,6 +68,21 @@ class Oli_CF_Upgrade {
 			update_option( self::OPTION, $done, false );
 			update_option( self::REPORT, $report, false );
 		}
+
+		if ( empty( $done[ self::ROUTINE_JSON ] ) ) {
+			$repaired                   = self::repair_forms();
+			$done[ self::ROUTINE_JSON ] = time();
+			update_option( self::OPTION, $done, false );
+
+			$report = get_option( self::REPORT, array() );
+
+			if ( ! is_array( $report ) ) {
+				$report = array();
+			}
+
+			$report['repaired'] = $repaired;
+			update_option( self::REPORT, $report, false );
+		}
 	}
 
 	/**
@@ -70,6 +92,7 @@ class Oli_CF_Upgrade {
 		$dir = defined( 'OLI_CF_PLUGIN_DIR' ) ? OLI_CF_PLUGIN_DIR : dirname( __DIR__ ) . '/';
 
 		require_once $dir . 'includes/class-oli-cf-form-parser.php';
+		require_once $dir . 'includes/class-oli-cf-json-meta.php';
 		require_once $dir . 'includes/class-oli-cf-fields.php';
 		require_once $dir . 'includes/class-oli-cf-mailer.php';
 		require_once $dir . 'includes/class-oli-cf-notifications.php';
@@ -127,7 +150,7 @@ class Oli_CF_Upgrade {
 		$form_id = (int) $form_id;
 		$schema  = get_post_meta( $form_id, '_oli_cf_schema', true );
 
-		if ( Oli_CF_Fields::SCHEMA === (string) $schema ) {
+		if ( '2' === (string) $schema || Oli_CF_Fields::SCHEMA === (string) $schema ) {
 			return array(
 				'status'        => 'skipped',
 				'fields'        => 0,
@@ -159,10 +182,10 @@ class Oli_CF_Upgrade {
 			}
 		}
 
-		update_post_meta( $form_id, Oli_CF_Fields::META, Oli_CF_Fields::encode( $fields ) );
+		Oli_CF_Fields::save( $form_id, $fields );
 
 		$notifications = Oli_CF_Notifications::from_legacy_mail( $mail, $mail_2 );
-		update_post_meta( $form_id, Oli_CF_Notifications::META, Oli_CF_Notifications::encode( $notifications ) );
+		Oli_CF_Notifications::save( $form_id, $notifications );
 		update_post_meta( $form_id, '_oli_cf_messages', Oli_CF_Validator::normalize_messages( $messages ) );
 		update_post_meta( $form_id, '_oli_cf_schema', Oli_CF_Fields::SCHEMA );
 
@@ -195,12 +218,76 @@ class Oli_CF_Upgrade {
 		$fields        = Oli_CF_Fields::from_legacy_template( $template );
 		$notifications = Oli_CF_Notifications::from_legacy_mail( $mail, $mail_2 );
 
-		update_post_meta( $form_id, Oli_CF_Fields::META, Oli_CF_Fields::encode( $fields ) );
-		update_post_meta( $form_id, Oli_CF_Notifications::META, Oli_CF_Notifications::encode( $notifications ) );
+		Oli_CF_Fields::save( $form_id, $fields );
+		Oli_CF_Notifications::save( $form_id, $notifications );
 		update_post_meta( $form_id, '_oli_cf_messages', Oli_CF_Validator::normalize_messages( is_array( $messages ) ? $messages : array() ) );
 		update_post_meta( $form_id, '_oli_cf_schema', Oli_CF_Fields::SCHEMA );
 
 		return true;
+	}
+
+	/**
+	 * Rewrite JSON that no longer matches the legacy copy. Safe to run again.
+	 *
+	 * A form already stored correctly is left untouched. Schema 3 records that
+	 * this comparison has been made.
+	 *
+	 * @return int Number of forms rewritten.
+	 */
+	public static function repair_forms() {
+		self::load();
+
+		$repaired = 0;
+
+		foreach ( self::form_ids() as $form_id ) {
+			if ( self::repair_form( $form_id ) ) {
+				++$repaired;
+			}
+		}
+
+		return $repaired;
+	}
+
+	/**
+	 * Reconvert one form from its legacy copy when the stored JSON differs.
+	 *
+	 * @param int $form_id Form ID.
+	 * @return bool Whether the stored JSON was rewritten.
+	 */
+	public static function repair_form( $form_id ) {
+		self::load();
+
+		$form_id   = (int) $form_id;
+		$template  = get_post_meta( $form_id, '_oli_cf_legacy_template', true );
+		$mail      = get_post_meta( $form_id, '_oli_cf_legacy_mail', true );
+		$mail_2    = get_post_meta( $form_id, '_oli_cf_legacy_mail_2', true );
+		$rewritten = false;
+
+		if ( is_string( $template ) && '' !== trim( $template ) ) {
+			$fields    = Oli_CF_Fields::from_legacy_template( $template );
+			$canonical = Oli_CF_Fields::encode( $fields );
+
+			if ( Oli_CF_Fields::read( $form_id ) !== $canonical ) {
+				Oli_CF_Fields::save( $form_id, $fields );
+				$rewritten = true;
+			}
+		}
+
+		if ( ( is_array( $mail ) && ! empty( $mail ) ) || ( is_array( $mail_2 ) && ! empty( $mail_2 ) ) ) {
+			$notifications = Oli_CF_Notifications::from_legacy_mail( $mail, $mail_2 );
+			$canonical     = Oli_CF_Notifications::encode( $notifications );
+
+			if ( Oli_CF_Notifications::read( $form_id ) !== $canonical ) {
+				Oli_CF_Notifications::save( $form_id, $notifications );
+				$rewritten = true;
+			}
+		}
+
+		if ( Oli_CF_Fields::SCHEMA !== (string) get_post_meta( $form_id, '_oli_cf_schema', true ) ) {
+			update_post_meta( $form_id, '_oli_cf_schema', Oli_CF_Fields::SCHEMA );
+		}
+
+		return $rewritten;
 	}
 
 	/**

@@ -111,7 +111,7 @@ class Oli_CF_Meta_Boxes {
 	private function render_field_row( $index, $field, $template ) {
 		$name = $template ? '__INDEX__' : (string) $index;
 		?>
-		<div class="oli-cf-repeater-row">
+		<div class="oli-cf-repeater-row<?php echo esc_attr( 'file' === $field['type'] ? ' oli-cf-type-file' : '' ); ?>">
 			<p>
 				<label>
 					<?php esc_html_e( 'Type', 'oli-contact-form' ); ?>
@@ -159,7 +159,7 @@ class Oli_CF_Meta_Boxes {
 					<textarea name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][options]" rows="3" class="large-text"><?php echo esc_textarea( implode( "\n", $field['options'] ) ); ?></textarea>
 				</label>
 			</p>
-			<p>
+			<p class="oli-cf-file-options">
 				<label>
 					<?php esc_html_e( 'File size limit', 'oli-contact-form' ); ?>
 					<input type="text" class="small-text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][limit]" value="<?php echo esc_attr( $field['limit'] ); ?>" placeholder="2mb" />
@@ -400,12 +400,12 @@ class Oli_CF_Meta_Boxes {
 			$fields = Oli_CF_Fields::from_posted( is_array( $posted ) ? $posted : array() );
 		}
 
-		update_post_meta( $post_id, Oli_CF_Fields::META, Oli_CF_Fields::encode( $fields ) );
+		Oli_CF_Fields::save( $post_id, $fields );
 		update_post_meta( $post_id, '_oli_cf_schema', Oli_CF_Fields::SCHEMA );
 
 		$posted_notifications = isset( $_POST['oli_cf_notifications'] ) ? map_deep( wp_unslash( $_POST['oli_cf_notifications'] ), 'sanitize_textarea_field' ) : array();
 		$notifications        = Oli_CF_Notifications::from_posted( is_array( $posted_notifications ) ? $posted_notifications : array() );
-		update_post_meta( $post_id, Oli_CF_Notifications::META, Oli_CF_Notifications::encode( $notifications ) );
+		Oli_CF_Notifications::save( $post_id, $notifications );
 
 		if ( isset( $_POST['oli_cf_messages'] ) ) {
 			$messages = map_deep( wp_unslash( $_POST['oli_cf_messages'] ), 'sanitize_text_field' );

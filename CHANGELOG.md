@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Modifié
 - Les formulaires déjà enregistrés sont convertis une seule fois. L'ancien contenu est conservé et peut être restauré. Un avis d'administration résume la conversion.
 - Clés de message (`success`, `send_error`, `required`, …) et classe CSS `oli-cf-control`.
-- Le réglage qui conserve le shortcode `contact-form-7` s'appelle `legacy_shortcode_compat`. L'ancienne page d'import redirige vers Importer.
+- Le réglage qui conserve le shortcode `contact-form-7` s'appelle `legacy_shortcode_compat`. Ce nom de shortcode reste dans le réglage, le rendu public, le catalogue de traduction, le readme et les tests : les pages qui l'utilisent déjà continuent de fonctionner. L'ancienne page d'import redirige vers Importer.
+- Le JSON des champs et des notifications est enregistré avec `wp_slash()` pour que `update_post_meta()` ne détruise pas les retours à la ligne ni les caractères échappés. Une passe idempotente (schéma 3) reconvertit depuis la copie d'origine quand le JSON stocké diffère.
 
 ## [0.3.12] - 2026-10-27
 

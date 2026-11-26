@@ -51,6 +51,15 @@ if ( class_exists( '\PHPUnit\Framework\TestCase' ) ) {
 		protected function assertStringContainsString( $needle, $haystack, $message = '' ) {
 			oli_cf_assert_true( false !== strpos( (string) $haystack, (string) $needle ), '' !== $message ? $message : 'assertStringContainsString' );
 		}
+
+		/**
+		 * @param string $needle   Needle.
+		 * @param string $haystack Haystack.
+		 * @param string $message  Message.
+		 */
+		protected function assertStringNotContainsString( $needle, $haystack, $message = '' ) {
+			oli_cf_assert_true( false === strpos( (string) $haystack, (string) $needle ), '' !== $message ? $message : 'assertStringNotContainsString' );
+		}
 	}
 }
 
@@ -173,7 +182,7 @@ class FormModelTest extends Oli_CF_Form_Model_TestCase {
 		$report = Oli_CF_Upgrade::migrate_forms();
 
 		$this->assertSame( 1, $report['converted'] );
-		$this->assertSame( '2', get_post_meta( 4, '_oli_cf_schema', true ) );
+		$this->assertSame( '3', get_post_meta( 4, '_oli_cf_schema', true ) );
 		$this->assertSame( $template, get_post_meta( 4, '_oli_cf_legacy_template', true ) );
 
 		$fields = Oli_CF_Fields::for_form( 4 );
@@ -386,6 +395,52 @@ class FormModelTest extends Oli_CF_Form_Model_TestCase {
 		$this->assertSame( '{site:admin_email}', $formidable['notifications'][0]['to'] );
 		$this->assertSame( 'Field {field:email}', $formidable['notifications'][0]['subject'] );
 		$this->assertSame( 'Saved', $formidable['messages']['success'] );
+	}
+
+	/**
+	 * JSON damaged by wp_unslash() is rebuilt from the legacy copy, once.
+	 */
+	public function test_repair_restores_escaped_json() {
+		$subject = 'Merci — "café" 😀';
+		$body    = "Ligne 1\nLigne 2 \"citée\"";
+		$mail    = array(
+			'to'      => 'admin@example.com',
+			'from'    => 'admin@example.com',
+			'subject' => $subject,
+			'body'    => $body,
+		);
+		$mail_2  = array(
+			'active'  => true,
+			'to'      => 'ada@example.com',
+			'subject' => $subject,
+			'body'    => $body,
+		);
+
+		$GLOBALS['oli_cf_test_form_ids'] = array( 8 );
+		$GLOBALS['oli_cf_test_meta']     = array(
+			8 => array(
+				'_oli_cf_schema'          => '2',
+				'_oli_cf_legacy_template' => '[textarea message]',
+				'_oli_cf_legacy_mail'     => $mail,
+				'_oli_cf_legacy_mail_2'   => $mail_2,
+			),
+		);
+
+		$fields = Oli_CF_Fields::from_legacy_template( '[textarea message]' );
+		$notes  = Oli_CF_Notifications::from_legacy_mail( $mail, $mail_2 );
+		$GLOBALS['oli_cf_test_meta'][8][ Oli_CF_Fields::META ]        = wp_unslash( Oli_CF_Fields::encode( $fields ) );
+		$GLOBALS['oli_cf_test_meta'][8][ Oli_CF_Notifications::META ] = wp_unslash( Oli_CF_Notifications::encode( $notes ) );
+
+		$this->assertStringNotContainsString( '\\u2014', Oli_CF_Notifications::read( 8 ) );
+		$this->assertTrue( Oli_CF_Upgrade::repair_form( 8 ) );
+
+		$stored = Oli_CF_Notifications::for_form( 8 );
+		$this->assertSame( $subject, $stored[0]['subject'] );
+		$this->assertSame( $body, $stored[0]['body'] );
+		$this->assertStringContainsString( '\\n', Oli_CF_Notifications::read( 8 ) );
+		$this->assertStringContainsString( '\\u2014', Oli_CF_Notifications::read( 8 ) );
+		$this->assertSame( '3', get_post_meta( 8, '_oli_cf_schema', true ) );
+		$this->assertFalse( Oli_CF_Upgrade::repair_form( 8 ) );
 	}
 
 	/**

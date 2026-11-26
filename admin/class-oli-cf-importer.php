@@ -423,8 +423,8 @@ class Oli_CF_Importer {
 			return false;
 		}
 
-		update_post_meta( $post_id, Oli_CF_Fields::META, Oli_CF_Fields::encode( isset( $item['fields'] ) ? $item['fields'] : array() ) );
-		update_post_meta( $post_id, Oli_CF_Notifications::META, Oli_CF_Notifications::encode( isset( $item['notifications'] ) ? $item['notifications'] : array() ) );
+		Oli_CF_Fields::save( $post_id, isset( $item['fields'] ) ? $item['fields'] : array() );
+		Oli_CF_Notifications::save( $post_id, isset( $item['notifications'] ) ? $item['notifications'] : array() );
 		update_post_meta( $post_id, '_oli_cf_messages', Oli_CF_Validator::normalize_messages( isset( $item['messages'] ) ? $item['messages'] : array() ) );
 		update_post_meta( $post_id, '_oli_cf_schema', Oli_CF_Fields::SCHEMA );
 		update_post_meta( $post_id, '_oli_cf_imported_from', $source_key );

@@ -252,16 +252,24 @@ class Oli_CF_Admin {
 			return;
 		}
 
-		$count = absint( wp_unslash( $_GET['oli_cf_imported'] ) );
+		$count   = absint( wp_unslash( $_GET['oli_cf_imported'] ) );
+		$skipped = isset( $_GET['oli_cf_import_skipped'] ) ? absint( wp_unslash( $_GET['oli_cf_import_skipped'] ) ) : 0;
+		$message = sprintf(
+			/* translators: %d: number of imported forms */
+			_n( '%d form imported.', '%d forms imported.', $count, 'oli-contact-form' ),
+			$count
+		);
+
+		if ( $skipped > 0 ) {
+			$message .= ' ' . sprintf(
+				/* translators: %d: number of forms skipped because they were already imported */
+				_n( '%d duplicate was skipped.', '%d duplicates were skipped.', $skipped, 'oli-contact-form' ),
+				$skipped
+			);
+		}
 
 		echo '<div class="notice notice-success is-dismissible"><p>';
-		echo esc_html(
-			sprintf(
-				/* translators: %d: number of imported forms */
-				_n( '%d form imported.', '%d forms imported.', $count, 'oli-contact-form' ),
-				$count
-			)
-		);
+		echo esc_html( $message );
 		echo '</p></div>';
 	}
 }

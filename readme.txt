@@ -14,6 +14,8 @@ A lightweight contact form with spam protection and file attachments that are se
 
 Oli Contact Form is a simple, accessible form builder. Create forms in the admin list, embed them with a shortcode or a block, and send the result by email. Nothing is stored in a submissions table.
 
+Sites that already embed a form with the shortcode `[contact-form-7]` can keep that shortcode. The name stays in the setting, the public renderer, the translation catalog, this readme, and the tests on purpose, so those embeds keep working. It is not this plugin's field syntax. Forms are a field list, with an optional text form such as `{{field type="email" name="email" required}}`.
+
 Author: Olivier Bigras
 Author URI: https://github.com/olivierbigras
 Plugin URI: https://github.com/olivierbigras/Oli-contact-form
@@ -137,6 +139,7 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Mail tokens are `{field:email}`, `{site:title}`, `{site:url}`, `{site:admin_email}`, and `{submission:date}`.
 * Message keys and the control wrapper class use this plugin's own names (`success`, `required`, `oli-cf-control`).
 * Existing forms are converted once. The previous content is kept and can be restored from the editor. The admin shows a migration report.
+* JSON saved in form meta is slashed before `update_post_meta()`, and a later pass rebuilds any JSON that `wp_unslash()` had already damaged. The `[contact-form-7]` shortcode remains available for existing embeds.
 * Import reads Gravity Forms, WPForms, Ninja Forms, Fluent Forms, Formidable Forms, and forms saved for the `contact-form-7` shortcode. Nothing is imported until you confirm a preview, and imports are drafts. Source data is not modified.
 
 = 0.3.12 =

@@ -43,9 +43,16 @@ class Oli_CF {
 		$this->plugin_name = 'oli-contact-form';
 
 		$this->load_dependencies();
-		Oli_CF_Upgrade::maybe_upgrade();
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
+		$this->loader->add_action( 'init', $this, 'upgrade', 1 );
+	}
+
+	/**
+	 * Convert stored forms after translations can load.
+	 */
+	public function upgrade() {
+		Oli_CF_Upgrade::maybe_upgrade();
 	}
 
 	/**
@@ -55,6 +62,7 @@ class Oli_CF {
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-loader.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-post-type.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-form-parser.php';
+		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-json-meta.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-fields.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-uploads.php';
 		require_once OLI_CF_PLUGIN_DIR . 'includes/class-oli-cf-validator.php';

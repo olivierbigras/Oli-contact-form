@@ -62,6 +62,23 @@ if ( '' !== $node ) {
 	}
 }
 
+echo "=== JsonStorageWpTest.php ===\n";
+passthru( 'bash ' . escapeshellarg( __DIR__ . '/setup-wp-bench.sh' ), $code );
+
+if ( 0 !== (int) $code ) {
+	++$failed;
+} else {
+	$wp_root = getenv( 'OLI_CF_WP_PATH' );
+	$wp_root = is_string( $wp_root ) && '' !== $wp_root ? $wp_root : '/tmp/oli-cf-wp';
+	$wp_cli  = getenv( 'WP_CLI' );
+	$wp_cli  = is_string( $wp_cli ) && '' !== $wp_cli ? $wp_cli : '/tmp/wp-cli.phar';
+	passthru( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( $wp_cli ) . ' --path=' . escapeshellarg( $wp_root ) . ' eval-file ' . escapeshellarg( __DIR__ . '/JsonStorageWpTest.php' ), $code );
+
+	if ( 0 !== (int) $code ) {
+		++$failed;
+	}
+}
+
 if ( $failed > 0 ) {
 	fwrite( STDERR, "{$failed} test file(s) failed.\n" );
 	exit( 1 );

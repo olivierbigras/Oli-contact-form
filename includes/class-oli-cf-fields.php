@@ -30,7 +30,7 @@ class Oli_CF_Fields {
 	 *
 	 * @var string
 	 */
-	const SCHEMA = '2';
+	const SCHEMA = '3';
 
 	/**
 	 * Field types this plugin renders.
@@ -217,6 +217,26 @@ class Oli_CF_Fields {
 		$json = wp_json_encode( self::normalize_list( $fields ) );
 
 		return is_string( $json ) ? $json : '[]';
+	}
+
+	/**
+	 * Read the JSON stored for one form.
+	 *
+	 * @param int $post_id Form ID.
+	 * @return string
+	 */
+	public static function read( $post_id ) {
+		return Oli_CF_Json_Meta::read( $post_id, self::META );
+	}
+
+	/**
+	 * Write the field list. The JSON is slashed because post meta unslashes on save.
+	 *
+	 * @param int                              $post_id Form ID.
+	 * @param array<int, array<string, mixed>> $fields  Fields.
+	 */
+	public static function save( $post_id, $fields ) {
+		Oli_CF_Json_Meta::write( $post_id, self::META, self::encode( $fields ) );
 	}
 
 	/**

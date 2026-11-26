@@ -40,7 +40,31 @@
 		});
 		repeater.appendChild(clone);
 		reindex(repeater);
+		syncFieldType(clone);
 	}
+
+	function syncFieldType(row) {
+		var select = row.querySelector('select[name$="[type]"]');
+		if (!select) {
+			return;
+		}
+		if (select.value === 'file') {
+			row.classList.add('oli-cf-type-file');
+		} else {
+			row.classList.remove('oli-cf-type-file');
+		}
+	}
+
+	document.addEventListener('change', function (event) {
+		var select = event.target;
+		if (!select || !select.matches || !select.matches('select[name$="[type]"]')) {
+			return;
+		}
+		var row = select.closest('.oli-cf-repeater-row');
+		if (row) {
+			syncFieldType(row);
+		}
+	});
 
 	document.addEventListener('click', function (event) {
 		var add = event.target.closest ? event.target.closest('.oli-cf-add-row') : null;

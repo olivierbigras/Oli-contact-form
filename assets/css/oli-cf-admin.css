@@ -44,3 +44,7 @@
 	width: 100%;
 	max-width: 40rem;
 }
+
+.oli-cf-repeater-row:not(.oli-cf-type-file) .oli-cf-file-options {
+	display: none;
+}

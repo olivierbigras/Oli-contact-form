@@ -128,6 +128,20 @@ if ( ! function_exists( 'wp_unslash' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_slash' ) ) {
+	/**
+	 * @param mixed $value Value.
+	 * @return mixed
+	 */
+	function wp_slash( $value ) {
+		if ( is_array( $value ) ) {
+			return array_map( 'wp_slash', $value );
+		}
+
+		return is_string( $value ) ? addslashes( $value ) : $value;
+	}
+}
+
 if ( ! function_exists( 'wp_strip_all_tags' ) ) {
 	/**
 	 * @param string $text Text.
@@ -696,7 +710,7 @@ if ( ! function_exists( 'update_post_meta' ) ) {
 	 * @return bool
 	 */
 	function update_post_meta( $id, $key, $value ) {
-		$GLOBALS['oli_cf_test_meta'][ (int) $id ][ (string) $key ] = $value;
+		$GLOBALS['oli_cf_test_meta'][ (int) $id ][ (string) $key ] = wp_unslash( $value );
 		return true;
 	}
 }
@@ -981,6 +995,7 @@ function oli_cf_assert_false( $actual, $label ) {
 }
 
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-form-parser.php';
+require_once dirname( __DIR__ ) . '/includes/class-oli-cf-json-meta.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-fields.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-uploads.php';
 require_once dirname( __DIR__ ) . '/includes/class-oli-cf-validator.php';

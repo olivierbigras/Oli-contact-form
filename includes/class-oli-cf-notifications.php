@@ -187,6 +187,26 @@ class Oli_CF_Notifications {
 	}
 
 	/**
+	 * Read the JSON stored for one form.
+	 *
+	 * @param int $post_id Form ID.
+	 * @return string
+	 */
+	public static function read( $post_id ) {
+		return Oli_CF_Json_Meta::read( $post_id, self::META );
+	}
+
+	/**
+	 * Write the notification list. The JSON is slashed because post meta unslashes on save.
+	 *
+	 * @param int                              $post_id       Form ID.
+	 * @param array<int, array<string, mixed>> $notifications Notifications.
+	 */
+	public static function save( $post_id, $notifications ) {
+		Oli_CF_Json_Meta::write( $post_id, self::META, self::encode( $notifications ) );
+	}
+
+	/**
 	 * Normalize a list of notifications.
 	 *
 	 * @param array<int, mixed> $notifications Raw list.

@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-26T19:06:34+00:00\n"
+"POT-Creation-Date: 2026-11-26T19:27:54+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: oli-contact-form\n"
@@ -58,10 +58,18 @@ msgid "Form update: %1$d forms now use the field builder (%2$d fields, %3$d noti
 msgstr ""
 
 #. translators: %d: number of imported forms
-#: admin/class-oli-cf-admin.php:261
+#: admin/class-oli-cf-admin.php:259
 #, php-format
 msgid "%d form imported."
 msgid_plural "%d forms imported."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: number of forms skipped because they were already imported
+#: admin/class-oli-cf-admin.php:266
+#, php-format
+msgid "%d duplicate was skipped."
+msgid_plural "%d duplicates were skipped."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -75,8 +83,8 @@ msgid "Import"
 msgstr ""
 
 #: admin/class-oli-cf-importer.php:62
-#: admin/class-oli-cf-importer.php:230
-#: admin/class-oli-cf-importer.php:297
+#: admin/class-oli-cf-importer.php:227
+#: admin/class-oli-cf-importer.php:294
 #: admin/class-oli-cf-meta-boxes.php:428
 msgid "You do not have permission to perform this action."
 msgstr ""
@@ -89,38 +97,38 @@ msgstr ""
 msgid "Choose a source, review the fields that cannot be converted, then import the forms you want as drafts."
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:163
+#: admin/class-oli-cf-importer.php:160
 msgid "This source has no forms to import."
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:169
+#: admin/class-oli-cf-importer.php:166
 msgid "Form"
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:183
+#: admin/class-oli-cf-importer.php:180
 msgid "Preview selected forms"
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:206
+#: admin/class-oli-cf-importer.php:203
 msgid "Every field can be imported."
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:208
+#: admin/class-oli-cf-importer.php:205
 msgid "These fields will be left out:"
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:216
+#: admin/class-oli-cf-importer.php:213
 msgid "Import as drafts"
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:226
-#: admin/class-oli-cf-importer.php:293
+#: admin/class-oli-cf-importer.php:223
+#: admin/class-oli-cf-importer.php:290
 #: admin/class-oli-cf-meta-boxes.php:424
 #: includes/class-oli-cf-submission.php:89
 msgid "Security check failed."
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:415
+#: admin/class-oli-cf-importer.php:412
 msgid "Imported form"
 msgstr ""
 
@@ -444,7 +452,7 @@ msgid "I consent to being contacted about this inquiry."
 msgstr ""
 
 #: includes/class-oli-cf-fields.php:135
-#: includes/class-oli-cf-fields.php:459
+#: includes/class-oli-cf-fields.php:479
 #: includes/class-oli-cf-form-parser.php:926
 #: includes/import/class-oli-cf-import-source-fluent.php:162
 #: includes/import/class-oli-cf-import-source-formidable.php:155
@@ -489,13 +497,13 @@ msgid ""
 msgstr ""
 
 #: includes/class-oli-cf-notifications.php:60
-#: includes/class-oli-cf-notifications.php:289
+#: includes/class-oli-cf-notifications.php:309
 #: includes/import/class-oli-cf-import-source.php:205
 msgid "Admin notification"
 msgstr ""
 
 #: includes/class-oli-cf-notifications.php:77
-#: includes/class-oli-cf-notifications.php:297
+#: includes/class-oli-cf-notifications.php:317
 #: includes/import/class-oli-cf-import-source.php:218
 msgid "Sender confirmation"
 msgstr ""
