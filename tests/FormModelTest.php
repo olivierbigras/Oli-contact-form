@@ -398,6 +398,27 @@ class FormModelTest extends Oli_CF_Form_Model_TestCase {
 	}
 
 	/**
+	 * A new form asks for consent before it can be sent.
+	 */
+	public function test_default_consent_is_required() {
+		$found = false;
+
+		foreach ( Oli_CF_Fields::defaults() as $field ) {
+			if ( 'consent' === $field['name'] ) {
+				$found = true;
+				$this->assertTrue( $field['required'] );
+				$this->assertSame( 'acceptance', $field['type'] );
+			}
+		}
+
+		$this->assertTrue( $found );
+		$this->assertSame( 'Text', Oli_CF_Fields::type_label( 'text' ) );
+		$this->assertSame( 'Phone', Oli_CF_Fields::type_label( 'tel' ) );
+		$this->assertSame( 'Paragraph', Oli_CF_Fields::type_label( 'textarea' ) );
+		$this->assertSame( 'Submit', Oli_CF_Fields::type_label( 'submit' ) );
+	}
+
+	/**
 	 * A later edit survives another upgrade. The legacy copy is not reapplied.
 	 */
 	public function test_upgrade_keeps_later_editor_changes() {

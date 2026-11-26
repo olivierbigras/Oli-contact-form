@@ -48,3 +48,26 @@
 .oli-cf-repeater-row:not(.oli-cf-type-file) .oli-cf-file-options {
 	display: none;
 }
+
+.oli-cf-repeater-row:not(.oli-cf-type-select):not(.oli-cf-type-radio):not(.oli-cf-type-checkbox) .oli-cf-choice-options {
+	display: none;
+}
+
+.oli-cf-repeater-row:not(.oli-cf-type-text):not(.oli-cf-type-email):not(.oli-cf-type-tel):not(.oli-cf-type-url):not(.oli-cf-type-textarea) .oli-cf-length-options {
+	display: none;
+}
+
+.oli-cf-repeater-row:not(.oli-cf-type-text):not(.oli-cf-type-email):not(.oli-cf-type-tel):not(.oli-cf-type-url):not(.oli-cf-type-number):not(.oli-cf-type-date):not(.oli-cf-type-textarea) .oli-cf-placeholder-options {
+	display: none;
+}
+
+.oli-cf-type-submit .oli-cf-required-option {
+	display: none;
+}
+
+.oli-cf-condition-always .oli-cf-condition-field,
+.oli-cf-condition-always .oli-cf-condition-value,
+.oli-cf-condition-empty .oli-cf-condition-value,
+.oli-cf-condition-not_empty .oli-cf-condition-value {
+	display: none;
+}

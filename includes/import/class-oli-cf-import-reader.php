@@ -113,10 +113,9 @@ class Oli_CF_Import_Reader {
 
 		$posts = get_posts(
 			array(
-				'post_type'        => $post_type,
-				'post_status'      => array( 'publish', 'draft', 'private', 'pending' ),
-				'posts_per_page'   => -1,
-				'suppress_filters' => true,
+				'post_type'      => $post_type,
+				'post_status'    => array( 'publish', 'draft', 'private', 'pending' ),
+				'posts_per_page' => -1,
 			)
 		);
 		$rows  = array();

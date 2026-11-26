@@ -108,7 +108,9 @@ class Oli_CF_Admin {
 			$this->plugin_name,
 			'oliCfAdmin',
 			array(
-				'strings' => array(
+				'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+				'dismissNonce' => wp_create_nonce( 'oli_cf_dismiss_migration' ),
+				'strings'      => array(
 					'remove' => __( 'Remove', 'oli-contact-form' ),
 				),
 			)
@@ -180,7 +182,7 @@ class Oli_CF_Admin {
 			return;
 		}
 
-		if ( get_option( 'oli_cf_migration_report_dismissed' ) ) {
+		if ( get_user_meta( get_current_user_id(), 'oli_cf_migration_dismissed', true ) || get_option( 'oli_cf_migration_report_dismissed' ) ) {
 			return;
 		}
 
@@ -195,7 +197,7 @@ class Oli_CF_Admin {
 			'oli_cf_dismiss_migration'
 		);
 		?>
-		<div class="notice notice-info is-dismissible">
+		<div class="notice notice-info is-dismissible" data-oli-dismiss="migration">
 			<p>
 				<?php
 				echo esc_html(
@@ -226,7 +228,7 @@ class Oli_CF_Admin {
 			return;
 		}
 
-		update_option( 'oli_cf_migration_report_dismissed', 1, false );
+		update_user_meta( get_current_user_id(), 'oli_cf_migration_dismissed', '1' );
 
 		if ( function_exists( 'wp_get_referer' ) && function_exists( 'wp_safe_redirect' ) && function_exists( 'remove_query_arg' ) ) {
 			$target = wp_get_referer();
@@ -271,5 +273,19 @@ class Oli_CF_Admin {
 		echo '<div class="notice notice-success is-dismissible"><p>';
 		echo esc_html( $message );
 		echo '</p></div>';
+	}
+
+	/**
+	 * Remember that this user closed the conversion notice.
+	 */
+	public function ajax_dismiss_migration() {
+		check_ajax_referer( 'oli_cf_dismiss_migration' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'oli-contact-form' ), '', array( 'response' => 403 ) );
+		}
+
+		update_user_meta( get_current_user_id(), 'oli_cf_migration_dismissed', '1' );
+		wp_die();
 	}
 }

@@ -38,22 +38,44 @@ class Oli_CF_Fields {
 	 * @return string[]
 	 */
 	public static function types() {
+		return array_keys( self::type_labels() );
+	}
+
+	/**
+	 * Visible names for the field types.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function type_labels() {
 		return array(
-			'text',
-			'email',
-			'tel',
-			'url',
-			'number',
-			'date',
-			'textarea',
-			'select',
-			'radio',
-			'checkbox',
-			'acceptance',
-			'file',
-			'hidden',
-			'submit',
+			'text'       => __( 'Text', 'oli-contact-form' ),
+			'email'      => __( 'Email', 'oli-contact-form' ),
+			'tel'        => __( 'Phone', 'oli-contact-form' ),
+			'url'        => __( 'URL', 'oli-contact-form' ),
+			'number'     => __( 'Number', 'oli-contact-form' ),
+			'date'       => __( 'Date', 'oli-contact-form' ),
+			'textarea'   => __( 'Paragraph', 'oli-contact-form' ),
+			'select'     => __( 'Dropdown', 'oli-contact-form' ),
+			'radio'      => __( 'Radio buttons', 'oli-contact-form' ),
+			'checkbox'   => __( 'Checkboxes', 'oli-contact-form' ),
+			'acceptance' => __( 'Acceptance', 'oli-contact-form' ),
+			'file'       => __( 'File', 'oli-contact-form' ),
+			'hidden'     => __( 'Hidden', 'oli-contact-form' ),
+			'submit'     => __( 'Submit', 'oli-contact-form' ),
 		);
+	}
+
+	/**
+	 * Visible name of one field type.
+	 *
+	 * @param string $type Type identifier.
+	 * @return string
+	 */
+	public static function type_label( $type ) {
+		$labels = self::type_labels();
+		$type   = self::normalize_type( $type );
+
+		return isset( $labels[ $type ] ) ? $labels[ $type ] : $type;
 	}
 
 	/**
@@ -131,7 +153,7 @@ class Oli_CF_Fields {
 			self::make( 'email', 'email', __( 'Your email', 'oli-contact-form' ), true ),
 			self::make( 'text', 'subject', __( 'Subject', 'oli-contact-form' ), true ),
 			self::make( 'textarea', 'message', __( 'Your message', 'oli-contact-form' ), false ),
-			self::make( 'acceptance', 'consent', __( 'I consent to being contacted about this inquiry.', 'oli-contact-form' ), false ),
+			self::make( 'acceptance', 'consent', __( 'I consent to being contacted about this inquiry.', 'oli-contact-form' ), true ),
 			self::make( 'submit', 'submit', __( 'Send', 'oli-contact-form' ), false ),
 		);
 	}

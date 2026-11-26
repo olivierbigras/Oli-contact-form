@@ -220,7 +220,27 @@ foreach ( array( 'admin', 'includes', 'public' ) as $oli_cf_dir ) {
 
 // 0.3.12: the import result notice requires its own nonce.
 $oli_cf_importer = file_get_contents( dirname( __DIR__ ) . '/admin/class-oli-cf-importer.php' );
-oli_cf_assert_same( 2, substr_count( $oli_cf_importer, "'oli_cf_imported_nonce' => wp_create_nonce( 'oli_cf_imported' )" ), 'both import redirects carry the notice nonce' );
+oli_cf_assert_same( 1, substr_count( $oli_cf_importer, "'oli_cf_imported_nonce' => wp_create_nonce( 'oli_cf_imported' )" ), 'the import result redirect carries the notice nonce' );
+
+$oli_cf_meta = file_get_contents( dirname( __DIR__ ) . '/admin/class-oli-cf-meta-boxes.php' );
+$oli_cf_admin_js = file_get_contents( dirname( __DIR__ ) . '/assets/js/oli-cf-admin.js' );
+oli_cf_assert_true( false !== strpos( $oli_cf_meta, 'method="post"' ), 'restore is submitted with POST' );
+oli_cf_assert_true( false !== strpos( $oli_cf_meta, "wp_nonce_field( 'oli_cf_restore_form_'" ), 'restore form includes a nonce' );
+oli_cf_assert_true( false !== strpos( $oli_cf_meta, "\$_POST['form_id']" ), 'restore reads the form id from POST' );
+oli_cf_assert_true( false === strpos( $oli_cf_meta, "\$_GET['form_id']" ), 'restore does not take the form id from the query string' );
+oli_cf_assert_true( false !== strpos( $oli_cf_meta, "current_user_can( 'edit_post'" ), 'restore checks the edit capability' );
+oli_cf_assert_true( false !== strpos( $oli_cf_meta, '#oli-cf-fields' ), 'restore returns focus to the field list' );
+oli_cf_assert_true( false !== strpos( $oli_cf_admin_js, 'data-oli-confirm' ) && false !== strpos( $oli_cf_admin_js, 'window.confirm' ), 'restore asks for confirmation' );
+
+$oli_cf_import_js = file_get_contents( dirname( __DIR__ ) . '/assets/js/oli-cf-importer.js' );
+oli_cf_assert_true( false !== strpos( $oli_cf_importer, 'id="oli-cf-import-all"' ), 'select-all checkbox id is oli-cf-import-all' );
+oli_cf_assert_true( false !== strpos( $oli_cf_importer, "esc_attr_e( 'Select all forms'" ), 'select-all checkbox has an aria-label' );
+oli_cf_assert_true( false !== strpos( $oli_cf_import_js, "getElementById('oli-cf-import-all')" ), 'select-all script uses the same id' );
+oli_cf_assert_same( 0, substr_count( $oli_cf_import_js, 'oli-cf-select-all' ), 'the old select-all id is gone' );
+
+oli_cf_assert_same( 0, substr_count( $oli_cf_importer, "'oli_cf_imported'       => 0" ) + substr_count( $oli_cf_importer, "'oli_cf_imported' => 0" ), 'an empty preview is not reported as zero imports' );
+oli_cf_assert_true( false !== strpos( $oli_cf_importer, 'Select at least one form to preview.' ), 'an empty preview explains what to select' );
+oli_cf_assert_true( false !== strpos( $oli_cf_importer, 'notice-error' ), 'an empty preview is an error on the import screen' );
 
 if ( $oli_cf_failures > 0 ) {
 	fwrite( STDERR, "\n{$oli_cf_failures} front test(s) failed.\n" );

@@ -71,7 +71,7 @@ class Oli_CF_Meta_Boxes {
 
 		$fields[] = Oli_CF_Fields::blank();
 		?>
-		<div class="oli-cf-builder" id="oli-cf-fields">
+		<div class="oli-cf-builder" id="oli-cf-fields" tabindex="-1">
 			<p class="description">
 				<?php esc_html_e( 'Add each field below. Required fields are marked on the form. Choices go on separate lines.', 'oli-contact-form' ); ?>
 			</p>
@@ -110,14 +110,19 @@ class Oli_CF_Meta_Boxes {
 	 */
 	private function render_field_row( $index, $field, $template ) {
 		$name = $template ? '__INDEX__' : (string) $index;
+		$type = isset( $field['type'] ) ? Oli_CF_Fields::normalize_type( $field['type'] ) : 'text';
+
+		if ( ! in_array( $type, Oli_CF_Fields::types(), true ) ) {
+			$type = 'text';
+		}
 		?>
-		<div class="oli-cf-repeater-row<?php echo esc_attr( 'file' === $field['type'] ? ' oli-cf-type-file' : '' ); ?>">
+		<div class="oli-cf-repeater-row oli-cf-type-<?php echo esc_attr( $type ); ?>">
 			<p>
 				<label>
 					<?php esc_html_e( 'Type', 'oli-contact-form' ); ?>
 					<select name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][type]">
-						<?php foreach ( Oli_CF_Fields::types() as $type ) : ?>
-							<option value="<?php echo esc_attr( $type ); ?>" <?php selected( $field['type'], $type ); ?>><?php echo esc_html( $type ); ?></option>
+						<?php foreach ( Oli_CF_Fields::type_labels() as $type_id => $type_label ) : ?>
+							<option value="<?php echo esc_attr( $type_id ); ?>" <?php selected( $field['type'], $type_id ); ?>><?php echo esc_html( $type_label ); ?></option>
 						<?php endforeach; ?>
 					</select>
 				</label>
@@ -129,14 +134,14 @@ class Oli_CF_Meta_Boxes {
 					<?php esc_html_e( 'Label', 'oli-contact-form' ); ?>
 					<input type="text" class="regular-text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][label]" value="<?php echo esc_attr( $field['label'] ); ?>" />
 				</label>
-				<label>
+				<label class="oli-cf-required-option">
 					<input type="checkbox" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][required]" value="1" <?php checked( ! empty( $field['required'] ) ); ?> />
 					<?php esc_html_e( 'Required', 'oli-contact-form' ); ?>
 				</label>
 				<button type="button" class="button-link oli-cf-remove-row"><?php esc_html_e( 'Remove', 'oli-contact-form' ); ?></button>
 			</p>
 			<p>
-				<label>
+				<label class="oli-cf-placeholder-options">
 					<?php esc_html_e( 'Placeholder', 'oli-contact-form' ); ?>
 					<input type="text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][placeholder]" value="<?php echo esc_attr( $field['placeholder'] ); ?>" />
 				</label>
@@ -144,16 +149,16 @@ class Oli_CF_Meta_Boxes {
 					<?php esc_html_e( 'Default', 'oli-contact-form' ); ?>
 					<input type="text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][default]" value="<?php echo esc_attr( $field['default'] ); ?>" />
 				</label>
-				<label>
+				<label class="oli-cf-length-options">
 					<?php esc_html_e( 'Min length', 'oli-contact-form' ); ?>
 					<input type="text" class="small-text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][minlength]" value="<?php echo esc_attr( $field['minlength'] ); ?>" />
 				</label>
-				<label>
+				<label class="oli-cf-length-options">
 					<?php esc_html_e( 'Max length', 'oli-contact-form' ); ?>
 					<input type="text" class="small-text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][maxlength]" value="<?php echo esc_attr( $field['maxlength'] ); ?>" />
 				</label>
 			</p>
-			<p>
+			<p class="oli-cf-choice-options">
 				<label>
 					<?php esc_html_e( 'Choices (one per line)', 'oli-contact-form' ); ?>
 					<textarea name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][options]" rows="3" class="large-text"><?php echo esc_textarea( implode( "\n", $field['options'] ) ); ?></textarea>
@@ -207,8 +212,13 @@ class Oli_CF_Meta_Boxes {
 	private function render_notification_row( $index, $notification ) {
 		$name      = (string) $index;
 		$condition = isset( $notification['condition'] ) && is_array( $notification['condition'] ) ? $notification['condition'] : array();
+		$operator  = isset( $condition['operator'] ) ? sanitize_key( (string) $condition['operator'] ) : 'always';
+
+		if ( ! array_key_exists( $operator, Oli_CF_Notifications::operators() ) ) {
+			$operator = 'always';
+		}
 		?>
-		<fieldset class="oli-cf-repeater-row">
+		<fieldset class="oli-cf-repeater-row oli-cf-condition-<?php echo esc_attr( $operator ); ?>">
 			<legend>
 				<?php echo esc_html( '' !== $notification['label'] ? $notification['label'] : __( 'Notification', 'oli-contact-form' ) ); ?>
 			</legend>
@@ -260,20 +270,20 @@ class Oli_CF_Meta_Boxes {
 					<textarea name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][headers]" rows="2" class="large-text code"><?php echo esc_textarea( $notification['headers'] ); ?></textarea>
 				</label>
 			</p>
-			<p>
+			<p class="oli-cf-condition">
 				<label>
 					<?php esc_html_e( 'Condition', 'oli-contact-form' ); ?>
 					<select name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][condition_operator]">
-						<?php foreach ( Oli_CF_Notifications::operators() as $operator => $operator_label ) : ?>
-							<option value="<?php echo esc_attr( $operator ); ?>" <?php selected( isset( $condition['operator'] ) ? $condition['operator'] : 'always', $operator ); ?>><?php echo esc_html( $operator_label ); ?></option>
+						<?php foreach ( Oli_CF_Notifications::operators() as $operator_id => $operator_label ) : ?>
+							<option value="<?php echo esc_attr( $operator_id ); ?>" <?php selected( $operator, $operator_id ); ?>><?php echo esc_html( $operator_label ); ?></option>
 						<?php endforeach; ?>
 					</select>
 				</label>
-				<label>
+				<label class="oli-cf-condition-field">
 					<?php esc_html_e( 'Field name', 'oli-contact-form' ); ?>
 					<input type="text" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][condition_field]" value="<?php echo esc_attr( isset( $condition['field'] ) ? $condition['field'] : '' ); ?>" />
 				</label>
-				<label>
+				<label class="oli-cf-condition-value">
 					<?php esc_html_e( 'Value', 'oli-contact-form' ); ?>
 					<input type="text" name="oli_cf_notifications[<?php echo esc_attr( $name ); ?>][condition_value]" value="<?php echo esc_attr( isset( $condition['value'] ) ? $condition['value'] : '' ); ?>" />
 				</label>
@@ -294,21 +304,14 @@ class Oli_CF_Meta_Boxes {
 			return;
 		}
 
-		$url = wp_nonce_url(
-			add_query_arg(
-				array(
-					'action'  => 'oli_cf_restore_form',
-					'form_id' => $post_id,
-				),
-				admin_url( 'admin-post.php' )
-			),
-			'oli_cf_restore_form_' . $post_id
-		);
 		?>
-		<p>
-			<a class="button" href="<?php echo esc_url( $url ); ?>"><?php esc_html_e( 'Restore the original form', 'oli-contact-form' ); ?></a>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-oli-confirm="<?php echo esc_attr__( 'Restore the fields and notifications from the saved copy?', 'oli-contact-form' ); ?>">
+			<?php wp_nonce_field( 'oli_cf_restore_form_' . $post_id ); ?>
+			<input type="hidden" name="action" value="oli_cf_restore_form" />
+			<input type="hidden" name="form_id" value="<?php echo esc_attr( (string) absint( $post_id ) ); ?>" />
+			<button type="submit" class="button"><?php esc_html_e( 'Restore the original form', 'oli-contact-form' ); ?></button>
 			<span class="description"><?php esc_html_e( 'Rebuilds the fields and notifications from the copy saved before the update. The copy itself is kept.', 'oli-contact-form' ); ?></span>
-		</p>
+		</form>
 		<?php
 	}
 
@@ -417,8 +420,8 @@ class Oli_CF_Meta_Boxes {
 	 * Rebuild one form from the copy saved before the update.
 	 */
 	public function restore_form() {
-		$form_id = isset( $_GET['form_id'] ) ? absint( wp_unslash( $_GET['form_id'] ) ) : 0;
-		$nonce   = isset( $_GET['_wpnonce'] ) ? sanitize_key( wp_unslash( $_GET['_wpnonce'] ) ) : '';
+		$form_id = isset( $_POST['form_id'] ) ? absint( wp_unslash( $_POST['form_id'] ) ) : 0;
+		$nonce   = isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '';
 
 		if ( ! $form_id || ! wp_verify_nonce( $nonce, 'oli_cf_restore_form_' . $form_id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'oli-contact-form' ) );
@@ -428,15 +431,48 @@ class Oli_CF_Meta_Boxes {
 			wp_die( esc_html__( 'You do not have permission to perform this action.', 'oli-contact-form' ) );
 		}
 
-		Oli_CF_Upgrade::restore_form( $form_id );
-
-		$link = function_exists( 'get_edit_post_link' ) ? get_edit_post_link( $form_id, 'raw' ) : '';
+		$restored = Oli_CF_Upgrade::restore_form( $form_id );
+		$link     = function_exists( 'get_edit_post_link' ) ? get_edit_post_link( $form_id, 'raw' ) : '';
 
 		if ( ! is_string( $link ) || '' === $link ) {
-			$link = admin_url( 'edit.php?post_type=oli_contact_form' );
+			$link = admin_url( 'post.php?post=' . $form_id . '&action=edit' );
 		}
 
-		wp_safe_redirect( $link );
+		$link = add_query_arg(
+			array(
+				'oli_cf_restored'       => $restored ? '1' : '0',
+				'oli_cf_restored_nonce' => wp_create_nonce( 'oli_cf_restored_' . $form_id ),
+			),
+			$link
+		);
+
+		wp_safe_redirect( $link . '#oli-cf-fields' );
 		exit;
+	}
+
+	/**
+	 * Confirm a restore when the editor opens again.
+	 */
+	public function maybe_restore_notice() {
+		if ( ! is_admin() ) {
+			return;
+		}
+
+		$restored = filter_input( INPUT_GET, 'oli_cf_restored', FILTER_SANITIZE_NUMBER_INT );
+		$nonce    = filter_input( INPUT_GET, 'oli_cf_restored_nonce' );
+		$post_id  = absint( filter_input( INPUT_GET, 'post', FILTER_SANITIZE_NUMBER_INT ) );
+		$nonce    = is_string( $nonce ) ? sanitize_text_field( $nonce ) : '';
+
+		if ( '1' !== (string) $restored || ! $post_id || ! wp_verify_nonce( $nonce, 'oli_cf_restored_' . $post_id ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
+		echo '<div class="notice notice-success is-dismissible"><p>';
+		echo esc_html__( 'The original form was restored.', 'oli-contact-form' );
+		echo '</p></div>';
 	}
 }

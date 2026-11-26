@@ -98,6 +98,7 @@ class Oli_CF {
 		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_staging_notice' );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'maybe_dismiss_staging_notice' );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'maybe_dismiss_migration_notice' );
+		$this->loader->add_action( 'wp_ajax_oli_cf_dismiss_migration', $plugin_admin, 'ajax_dismiss_migration' );
 
 		$post_type = new Oli_CF_Post_Type();
 		$this->loader->add_action( 'init', $post_type, 'register_post_type' );
@@ -105,6 +106,7 @@ class Oli_CF {
 		$meta_boxes = new Oli_CF_Meta_Boxes();
 		$this->loader->add_action( 'add_meta_boxes', $meta_boxes, 'add_meta_boxes' );
 		$this->loader->add_action( 'save_post_oli_contact_form', $meta_boxes, 'save_form_data', 10, 2 );
+		$this->loader->add_action( 'admin_notices', $meta_boxes, 'maybe_restore_notice' );
 
 		$settings = new Oli_CF_Settings();
 		$this->loader->add_action( 'admin_menu', $settings, 'add_settings_page' );

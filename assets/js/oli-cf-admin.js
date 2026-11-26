@@ -41,6 +41,21 @@
 		repeater.appendChild(clone);
 		reindex(repeater);
 		syncFieldType(clone);
+		syncCondition(clone);
+		var focusable = clone.querySelector('select, input, textarea');
+		if (focusable && focusable.focus) {
+			focusable.focus();
+		}
+	}
+
+	function replaceClassPrefix(row, prefix, next) {
+		var classes = row.className.split(/\s+/).filter(function (name) {
+			return name && name.indexOf(prefix) !== 0;
+		});
+		if (next) {
+			classes.push(next);
+		}
+		row.className = classes.join(' ');
 	}
 
 	function syncFieldType(row) {
@@ -48,22 +63,58 @@
 		if (!select) {
 			return;
 		}
-		if (select.value === 'file') {
-			row.classList.add('oli-cf-type-file');
-		} else {
-			row.classList.remove('oli-cf-type-file');
+		replaceClassPrefix(row, 'oli-cf-type-', 'oli-cf-type-' + select.value);
+	}
+
+	function syncCondition(row) {
+		var select = row.querySelector('select[name$="[condition_operator]"]');
+		if (!select) {
+			return;
 		}
+		replaceClassPrefix(row, 'oli-cf-condition-', 'oli-cf-condition-' + select.value);
 	}
 
 	document.addEventListener('change', function (event) {
 		var select = event.target;
-		if (!select || !select.matches || !select.matches('select[name$="[type]"]')) {
+		if (!select || !select.matches) {
 			return;
 		}
-		var row = select.closest('.oli-cf-repeater-row');
-		if (row) {
+		var row = select.closest ? select.closest('.oli-cf-repeater-row') : null;
+		if (!row) {
+			return;
+		}
+		if (select.matches('select[name$="[type]"]')) {
 			syncFieldType(row);
 		}
+		if (select.matches('select[name$="[condition_operator]"]')) {
+			syncCondition(row);
+		}
+	});
+
+	document.addEventListener('submit', function (event) {
+		var form = event.target;
+		var message = form && form.getAttribute ? form.getAttribute('data-oli-confirm') : '';
+		if (!message) {
+			return;
+		}
+		if (!window.confirm(message)) {
+			event.preventDefault();
+		}
+	});
+
+	document.addEventListener('click', function (event) {
+		var button = event.target && event.target.closest ? event.target.closest('.notice[data-oli-dismiss="migration"] .notice-dismiss') : null;
+		if (!button || !window.oliCfAdmin || !oliCfAdmin.dismissNonce || !window.fetch) {
+			return;
+		}
+		var body = new window.FormData();
+		body.append('action', 'oli_cf_dismiss_migration');
+		body.append('_ajax_nonce', oliCfAdmin.dismissNonce);
+		window.fetch(oliCfAdmin.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: body
+		});
 	});
 
 	document.addEventListener('click', function (event) {

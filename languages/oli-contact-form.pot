@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-26T19:27:54+00:00\n"
+"POT-Creation-Date: 2026-11-26T20:00:03+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: oli-contact-form\n"
@@ -40,25 +40,25 @@ msgstr ""
 msgid "https://github.com/olivierbigras"
 msgstr ""
 
-#: admin/class-oli-cf-admin.php:112
-#: admin/class-oli-cf-meta-boxes.php:136
-#: admin/class-oli-cf-meta-boxes.php:225
+#: admin/class-oli-cf-admin.php:114
+#: admin/class-oli-cf-meta-boxes.php:141
+#: admin/class-oli-cf-meta-boxes.php:235
 msgid "Remove"
 msgstr ""
 
-#: admin/class-oli-cf-admin.php:143
-#: admin/class-oli-cf-admin.php:211
+#: admin/class-oli-cf-admin.php:145
+#: admin/class-oli-cf-admin.php:213
 msgid "Dismiss"
 msgstr ""
 
 #. translators: 1: number of forms converted, 2: number of fields, 3: number of notifications.
-#: admin/class-oli-cf-admin.php:204
+#: admin/class-oli-cf-admin.php:206
 #, php-format
 msgid "Form update: %1$d forms now use the field builder (%2$d fields, %3$d notifications). The previous content was kept so it can be restored."
 msgstr ""
 
 #. translators: %d: number of imported forms
-#: admin/class-oli-cf-admin.php:259
+#: admin/class-oli-cf-admin.php:261
 #, php-format
 msgid "%d form imported."
 msgid_plural "%d forms imported."
@@ -66,12 +66,20 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d: number of forms skipped because they were already imported
-#: admin/class-oli-cf-admin.php:266
+#: admin/class-oli-cf-admin.php:268
 #, php-format
 msgid "%d duplicate was skipped."
 msgid_plural "%d duplicates were skipped."
 msgstr[0] ""
 msgstr[1] ""
+
+#: admin/class-oli-cf-admin.php:285
+#: admin/class-oli-cf-importer.php:62
+#: admin/class-oli-cf-importer.php:252
+#: admin/class-oli-cf-importer.php:320
+#: admin/class-oli-cf-meta-boxes.php:431
+msgid "You do not have permission to perform this action."
+msgstr ""
 
 #: admin/class-oli-cf-importer.php:30
 #: admin/class-oli-cf-importer.php:101
@@ -82,53 +90,58 @@ msgstr ""
 msgid "Import"
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:62
-#: admin/class-oli-cf-importer.php:227
-#: admin/class-oli-cf-importer.php:294
-#: admin/class-oli-cf-meta-boxes.php:428
-msgid "You do not have permission to perform this action."
+#: admin/class-oli-cf-importer.php:125
+msgid "Select at least one form to preview."
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:118
+#: admin/class-oli-cf-importer.php:131
+msgid "This preview has expired. Select the forms again."
+msgstr ""
+
+#: admin/class-oli-cf-importer.php:143
 msgid "No existing forms were found."
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:133
+#: admin/class-oli-cf-importer.php:158
 msgid "Choose a source, review the fields that cannot be converted, then import the forms you want as drafts."
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:160
+#: admin/class-oli-cf-importer.php:185
 msgid "This source has no forms to import."
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:166
+#: admin/class-oli-cf-importer.php:190
+msgid "Select all forms"
+msgstr ""
+
+#: admin/class-oli-cf-importer.php:191
 msgid "Form"
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:180
+#: admin/class-oli-cf-importer.php:205
 msgid "Preview selected forms"
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:203
+#: admin/class-oli-cf-importer.php:228
 msgid "Every field can be imported."
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:205
+#: admin/class-oli-cf-importer.php:230
 msgid "These fields will be left out:"
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:213
+#: admin/class-oli-cf-importer.php:238
 msgid "Import as drafts"
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:223
-#: admin/class-oli-cf-importer.php:290
-#: admin/class-oli-cf-meta-boxes.php:424
+#: admin/class-oli-cf-importer.php:248
+#: admin/class-oli-cf-importer.php:316
+#: admin/class-oli-cf-meta-boxes.php:427
 #: includes/class-oli-cf-submission.php:89
 msgid "Security check failed."
 msgstr ""
 
-#: admin/class-oli-cf-importer.php:412
+#: admin/class-oli-cf-importer.php:438
 msgid "Imported form"
 msgstr ""
 
@@ -168,180 +181,188 @@ msgstr ""
 msgid "Replace the fields from this text definition on save"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:117
+#: admin/class-oli-cf-meta-boxes.php:122
 msgid "Type"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:125
+#: admin/class-oli-cf-meta-boxes.php:130
 msgid "Name"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:129
-#: admin/class-oli-cf-meta-boxes.php:218
+#: admin/class-oli-cf-meta-boxes.php:134
+#: admin/class-oli-cf-meta-boxes.php:228
 msgid "Label"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:134
+#: admin/class-oli-cf-meta-boxes.php:139
 msgid "Required"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:140
+#: admin/class-oli-cf-meta-boxes.php:145
 msgid "Placeholder"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:144
+#: admin/class-oli-cf-meta-boxes.php:149
 msgid "Default"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:148
+#: admin/class-oli-cf-meta-boxes.php:153
 msgid "Min length"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:152
+#: admin/class-oli-cf-meta-boxes.php:157
 msgid "Max length"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:158
+#: admin/class-oli-cf-meta-boxes.php:163
 msgid "Choices (one per line)"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:164
+#: admin/class-oli-cf-meta-boxes.php:169
 msgid "File size limit"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:168
+#: admin/class-oli-cf-meta-boxes.php:173
 msgid "File types"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:187
+#: admin/class-oli-cf-meta-boxes.php:192
 msgid "Each notification is a separate email. Use tokens such as {field:email}, {site:title}, {site:admin_email}, and {submission:date}. Put the visitor address in Reply-To, not From, so mail is less likely to be rejected."
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:195
+#: admin/class-oli-cf-meta-boxes.php:200
 msgid "Add notification"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:213
+#: admin/class-oli-cf-meta-boxes.php:223
 #: includes/import/class-oli-cf-import-source.php:205
 msgid "Notification"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:223
+#: admin/class-oli-cf-meta-boxes.php:233
 msgid "Enabled"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:229
+#: admin/class-oli-cf-meta-boxes.php:239
 msgid "To"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:235
+#: admin/class-oli-cf-meta-boxes.php:245
 msgid "From"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:241
+#: admin/class-oli-cf-meta-boxes.php:251
 msgid "Reply-To"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:247
-#: includes/class-oli-cf-fields.php:132
+#: admin/class-oli-cf-meta-boxes.php:257
+#: includes/class-oli-cf-fields.php:154
 msgid "Subject"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:253
+#: admin/class-oli-cf-meta-boxes.php:263
 msgid "Body"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:259
+#: admin/class-oli-cf-meta-boxes.php:269
 msgid "Extra headers"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:265
+#: admin/class-oli-cf-meta-boxes.php:275
 msgid "Condition"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:273
+#: admin/class-oli-cf-meta-boxes.php:283
 msgid "Field name"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:277
+#: admin/class-oli-cf-meta-boxes.php:287
 msgid "Value"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:309
+#: admin/class-oli-cf-meta-boxes.php:308
+msgid "Restore the fields and notifications from the saved copy?"
+msgstr ""
+
+#: admin/class-oli-cf-meta-boxes.php:312
 msgid "Restore the original form"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:310
+#: admin/class-oli-cf-meta-boxes.php:313
 msgid "Rebuilds the fields and notifications from the copy saved before the update. The copy itself is kept."
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:323
+#: admin/class-oli-cf-meta-boxes.php:326
 msgid "Success message"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:324
+#: admin/class-oli-cf-meta-boxes.php:327
 msgid "Send error"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:325
+#: admin/class-oli-cf-meta-boxes.php:328
 msgid "Validation error"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:326
+#: admin/class-oli-cf-meta-boxes.php:329
 #: public/class-oli-cf-shortcode.php:249
 msgid "Required field"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:327
+#: admin/class-oli-cf-meta-boxes.php:330
 msgid "Invalid email"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:328
+#: admin/class-oli-cf-meta-boxes.php:331
 msgid "Invalid phone"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:329
+#: admin/class-oli-cf-meta-boxes.php:332
 msgid "Invalid URL"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:330
+#: admin/class-oli-cf-meta-boxes.php:333
 msgid "Invalid number"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:331
+#: admin/class-oli-cf-meta-boxes.php:334
 msgid "Invalid date"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:332
+#: admin/class-oli-cf-meta-boxes.php:335
 msgid "Too long"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:333
+#: admin/class-oli-cf-meta-boxes.php:336
 msgid "Too short"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:334
+#: admin/class-oli-cf-meta-boxes.php:337
 msgid "Acceptance required"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:335
+#: admin/class-oli-cf-meta-boxes.php:338
 msgid "Upload failed"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:336
+#: admin/class-oli-cf-meta-boxes.php:339
 msgid "File too large"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:337
+#: admin/class-oli-cf-meta-boxes.php:340
 msgid "File type not allowed"
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:358
+#: admin/class-oli-cf-meta-boxes.php:361
 msgid "Publish the form to get the shortcode."
 msgstr ""
 
-#: admin/class-oli-cf-meta-boxes.php:366
+#: admin/class-oli-cf-meta-boxes.php:369
 msgid "Copy this shortcode and paste it into your post, page, or text widget."
+msgstr ""
+
+#: admin/class-oli-cf-meta-boxes.php:475
+msgid "The original form was restored."
 msgstr ""
 
 #: admin/class-oli-cf-settings.php:41
@@ -435,24 +456,80 @@ msgstr ""
 msgid "Spam detected by Turnstile."
 msgstr ""
 
-#: includes/class-oli-cf-fields.php:130
+#: includes/class-oli-cf-fields.php:51
+msgid "Text"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:52
+msgid "Email"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:53
+msgid "Phone"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:54
+msgid "URL"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:55
+msgid "Number"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:56
+msgid "Date"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:57
+msgid "Paragraph"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:58
+msgid "Dropdown"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:59
+msgid "Radio buttons"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:60
+msgid "Checkboxes"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:61
+msgid "Acceptance"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:62
+msgid "File"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:63
+msgid "Hidden"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:64
+msgid "Submit"
+msgstr ""
+
+#: includes/class-oli-cf-fields.php:152
 msgid "Your name"
 msgstr ""
 
-#: includes/class-oli-cf-fields.php:131
+#: includes/class-oli-cf-fields.php:153
 msgid "Your email"
 msgstr ""
 
-#: includes/class-oli-cf-fields.php:133
+#: includes/class-oli-cf-fields.php:155
 msgid "Your message"
 msgstr ""
 
-#: includes/class-oli-cf-fields.php:134
+#: includes/class-oli-cf-fields.php:156
 msgid "I consent to being contacted about this inquiry."
 msgstr ""
 
-#: includes/class-oli-cf-fields.php:135
-#: includes/class-oli-cf-fields.php:479
+#: includes/class-oli-cf-fields.php:157
+#: includes/class-oli-cf-fields.php:501
 #: includes/class-oli-cf-form-parser.php:926
 #: includes/import/class-oli-cf-import-source-fluent.php:162
 #: includes/import/class-oli-cf-import-source-formidable.php:155

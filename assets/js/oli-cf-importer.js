@@ -5,7 +5,7 @@
 	'use strict';
 
 	document.addEventListener('DOMContentLoaded', function () {
-		var selectAll = document.getElementById('oli-cf-select-all');
+		var selectAll = document.getElementById('oli-cf-import-all');
 
 		if (!selectAll) {
 			return;

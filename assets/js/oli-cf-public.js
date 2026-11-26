@@ -197,6 +197,10 @@
 			formData.append('action', 'oli_cf_submit_form');
 			formData.append('nonce', (window.oliCf && oliCf.nonce) ? oliCf.nonce : '');
 
+			if ($form[0] && $form[0].setAttribute) {
+				$form[0].setAttribute('aria-busy', 'true');
+			}
+
 			$.ajax({
 				url: oliCf.ajaxUrl,
 				type: 'POST',
@@ -227,6 +231,9 @@
 					self.focusStatus($output);
 				},
 				complete: function() {
+					if ($form[0] && $form[0].setAttribute) {
+						$form[0].setAttribute('aria-busy', 'false');
+					}
 					self.resetSubmit($submit);
 				}
 			});

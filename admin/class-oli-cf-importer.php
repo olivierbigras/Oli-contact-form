@@ -99,6 +99,7 @@ class Oli_CF_Importer {
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Import existing forms', 'oli-contact-form' ); ?></h1>
+			<?php $this->render_notices( $step, $preview ); ?>
 			<?php if ( ! empty( $preview ) ) : ?>
 				<?php $this->render_preview( $token, $preview ); ?>
 			<?php else : ?>
@@ -106,6 +107,30 @@ class Oli_CF_Importer {
 			<?php endif; ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Errors for an empty selection or an expired preview.
+	 *
+	 * @param string               $step    Requested step.
+	 * @param array<string, mixed> $preview Stored preview, when it is still valid.
+	 */
+	private function render_notices( $step, $preview ) {
+		$error     = sanitize_key( (string) filter_input( INPUT_GET, 'oli_cf_import_error' ) );
+		$nonce_raw = filter_input( INPUT_GET, 'oli_cf_import_error_nonce' );
+		$nonce     = is_string( $nonce_raw ) ? sanitize_text_field( $nonce_raw ) : '';
+
+		if ( 'empty' === $error && wp_verify_nonce( $nonce, 'oli_cf_import_error' ) ) {
+			echo '<div class="notice notice-error"><p>';
+			echo esc_html__( 'Select at least one form to preview.', 'oli-contact-form' );
+			echo '</p></div>';
+		}
+
+		if ( 'preview' === $step && empty( $preview ) ) {
+			echo '<div class="notice notice-warning"><p>';
+			echo esc_html__( 'This preview has expired. Select the forms again.', 'oli-contact-form' );
+			echo '</p></div>';
+		}
 	}
 
 	/**
@@ -162,7 +187,7 @@ class Oli_CF_Importer {
 				<table class="widefat striped">
 					<thead>
 						<tr>
-							<td class="check-column"><input type="checkbox" id="oli-cf-import-all" /></td>
+							<td class="check-column"><input type="checkbox" id="oli-cf-import-all" aria-label="<?php esc_attr_e( 'Select all forms', 'oli-contact-form' ); ?>" /></td>
 							<th><?php esc_html_e( 'Form', 'oli-contact-form' ); ?></th>
 						</tr>
 					</thead>
@@ -246,10 +271,11 @@ class Oli_CF_Importer {
 			wp_safe_redirect(
 				add_query_arg(
 					array(
-						'post_type'             => 'oli_contact_form',
-						'page'                  => self::PAGE,
-						'oli_cf_imported'       => 0,
-						'oli_cf_imported_nonce' => wp_create_nonce( 'oli_cf_imported' ),
+						'post_type'                 => 'oli_contact_form',
+						'page'                      => self::PAGE,
+						'source'                    => $source_key,
+						'oli_cf_import_error'       => 'empty',
+						'oli_cf_import_error_nonce' => wp_create_nonce( 'oli_cf_import_error' ),
 					),
 					admin_url( 'edit.php' )
 				)

@@ -1,0 +1,69 @@
+# Copyright (C) 2026 Olivier Bigras
+# This file is distributed under the GPL v2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Oli Contact Form 0.4.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/oli-contact-form\n"
+"Language: fr_CA\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"X-Domain: oli-contact-form\n"
+
+msgid "Select at least one form to preview."
+msgstr "Sélectionnez au moins un formulaire à prévisualiser."
+
+msgid "This preview has expired. Select the forms again."
+msgstr "Cet aperçu a expiré. Sélectionnez de nouveau les formulaires."
+
+msgid "Select all forms"
+msgstr "Tout sélectionner"
+
+msgid "Restore the fields and notifications from the saved copy?"
+msgstr "Restaurer les champs et les notifications à partir de la copie enregistrée?"
+
+msgid "The original form was restored."
+msgstr "Le formulaire d'origine a été restauré."
+
+msgid "Text"
+msgstr "Texte"
+
+msgid "Email"
+msgstr "Courriel"
+
+msgid "Phone"
+msgstr "Téléphone"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "Number"
+msgstr "Nombre"
+
+msgid "Date"
+msgstr "Date"
+
+msgid "Paragraph"
+msgstr "Paragraphe"
+
+msgid "Dropdown"
+msgstr "Liste déroulante"
+
+msgid "Radio buttons"
+msgstr "Boutons radio"
+
+msgid "Checkboxes"
+msgstr "Cases à cocher"
+
+msgid "Acceptance"
+msgstr "Consentement"
+
+msgid "File"
+msgstr "Fichier"
+
+msgid "Hidden"
+msgstr "Masqué"
+
+msgid "Submit"
+msgstr "Envoyer"
