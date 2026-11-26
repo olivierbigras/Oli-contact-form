@@ -153,7 +153,7 @@ class Oli_CF_Fields {
 			self::make( 'email', 'email', __( 'Your email', 'oli-contact-form' ), true ),
 			self::make( 'text', 'subject', __( 'Subject', 'oli-contact-form' ), true ),
 			self::make( 'textarea', 'message', __( 'Your message', 'oli-contact-form' ), false ),
-			self::make( 'acceptance', 'consent', __( 'I consent to being contacted about this inquiry.', 'oli-contact-form' ), true ),
+			self::make( 'acceptance', 'consent', self::default_consent_label(), true ),
 			self::make( 'submit', 'submit', __( 'Send', 'oli-contact-form' ), false ),
 		);
 	}
@@ -667,16 +667,79 @@ class Oli_CF_Fields {
 	}
 
 	/**
+	 * Consent sentence for a new form, with the privacy policy when the site has one.
+	 *
+	 * @return string
+	 */
+	public static function default_consent_label() {
+		$plain = __( 'I consent to being contacted about this inquiry.', 'oli-contact-form' );
+		$url   = function_exists( 'get_privacy_policy_url' ) ? get_privacy_policy_url() : '';
+
+		if ( ! is_string( $url ) || '' === $url ) {
+			return $plain;
+		}
+
+		return sprintf(
+			/* translators: 1: opening link tag for the privacy policy, 2: closing link tag. */
+			__( 'I consent to being contacted about this inquiry and agree to the %1$sprivacy policy%2$s.', 'oli-contact-form' ),
+			'<a href="' . esc_url( $url ) . '">',
+			'</a>'
+		);
+	}
+
+	/**
+	 * Anchors kept while a label is cleaned. The key is a placeholder token.
+	 *
+	 * @var array<string, string>
+	 */
+	private static $label_links = array();
+
+	/**
 	 * Sanitize a single line of human text.
+	 *
+	 * A privacy-policy link is kept. Every other tag, and quotes outside that link, are removed.
 	 *
 	 * @param mixed $text Raw text.
 	 * @return string
 	 */
 	public static function sanitize_label( $text ) {
-		$text = str_replace( array( "\0", '"', '[', ']', '{', '}' ), '', (string) $text );
-		$text = wp_strip_all_tags( $text );
+		self::$label_links = array();
+		$text              = str_replace( array( "\0", '[', ']', '{', '}' ), '', (string) $text );
+		$text              = preg_replace_callback(
+			'/<a\s+href=(["\'])([^"\']+)\1[^>]*>([^<]*)<\/a>/i',
+			array( __CLASS__, 'capture_label_link' ),
+			$text
+		);
+		$text              = str_replace( '"', '', (string) $text );
+		$text              = wp_strip_all_tags( $text );
+		$text              = trim( (string) preg_replace( '/\s+/', ' ', (string) $text ) );
 
-		return trim( preg_replace( '/\s+/', ' ', $text ) );
+		if ( self::$label_links ) {
+			$text              = strtr( $text, self::$label_links );
+			self::$label_links = array();
+		}
+
+		return $text;
+	}
+
+	/**
+	 * Replace one allowed anchor with a token until the rest of the label is cleaned.
+	 *
+	 * @param array<int, string> $matches Regex matches.
+	 * @return string
+	 */
+	private static function capture_label_link( $matches ) {
+		$href = esc_url( $matches[2] );
+
+		if ( ! is_string( $href ) || 1 !== preg_match( '#\Ahttps?://#i', $href ) ) {
+			return wp_strip_all_tags( $matches[3] );
+		}
+
+		$inner                       = str_replace( array( '"', '[', ']', '{', '}' ), '', wp_strip_all_tags( $matches[3] ) );
+		$token                       = '%%OLI_CF_ANCHOR_' . count( self::$label_links ) . '%%';
+		self::$label_links[ $token ] = '<a href="' . $href . '">' . trim( $inner ) . '</a>';
+
+		return $token;
 	}
 
 	/**

@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clés de message (`success`, `send_error`, `required`, …) et classe CSS `oli-cf-control`.
 - Le réglage qui conserve le shortcode `contact-form-7` s'appelle `legacy_shortcode_compat`. Ce nom de shortcode reste dans le réglage, le rendu public, le catalogue de traduction, le readme et les tests : les pages qui l'utilisent déjà continuent de fonctionner. L'ancienne page d'import redirige vers Importer.
 - Le JSON des champs et des notifications est enregistré avec `wp_slash()` pour que `update_post_meta()` ne détruise pas les retours à la ligne ni les caractères échappés. La conversion ne s'exécute qu'une fois : un formulaire modifié ensuite n'est pas reconverti.
-- L'éditeur nomme les types de champs, masque les réglages qui ne s'appliquent pas, demande une confirmation avant de restaurer l'original, et le gabarit neuf exige le consentement. Les libellés français sont dans `fr_FR` et `fr_CA`.
+- L'éditeur nomme les types de champs, masque les réglages qui ne s'appliquent pas (y compris la valeur par défaut sur Envoyer), et le gabarit neuf exige le consentement, avec un lien vers la politique de confidentialité lorsqu'elle existe. La restauration se fait par un bouton qui envoie un formulaire hors de l'éditeur. Les libellés français sont dans `fr_FR` et `fr_CA`.
 
 ## [0.3.12] - 2026-10-27
 

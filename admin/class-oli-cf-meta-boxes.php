@@ -145,7 +145,7 @@ class Oli_CF_Meta_Boxes {
 					<?php esc_html_e( 'Placeholder', 'oli-contact-form' ); ?>
 					<input type="text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][placeholder]" value="<?php echo esc_attr( $field['placeholder'] ); ?>" />
 				</label>
-				<label>
+				<label class="oli-cf-default-option">
 					<?php esc_html_e( 'Default', 'oli-contact-form' ); ?>
 					<input type="text" name="oli_cf_fields[<?php echo esc_attr( $name ); ?>][default]" value="<?php echo esc_attr( $field['default'] ); ?>" />
 				</label>
@@ -304,15 +304,74 @@ class Oli_CF_Meta_Boxes {
 			return;
 		}
 
+		$action = admin_url( 'admin-post.php' );
 		?>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-oli-confirm="<?php echo esc_attr__( 'Restore the fields and notifications from the saved copy?', 'oli-contact-form' ); ?>">
+		<p>
+			<button type="submit" class="button" form="oli-cf-restore-form" formaction="<?php echo esc_url( $action ); ?>"><?php esc_html_e( 'Restore the original form', 'oli-contact-form' ); ?></button>
+			<span class="description"><?php esc_html_e( 'Rebuilds the fields and notifications from the copy saved before the update. The copy itself is kept.', 'oli-contact-form' ); ?></span>
+		</p>
+		<?php
+	}
+
+	/**
+	 * Print the restore form outside the editor form.
+	 *
+	 * The field meta box is rendered inside form#post. A nested form is discarded
+	 * by the browser, so the button above submits this one through the form attribute.
+	 */
+	public function render_restore_form() {
+		if ( ! $this->is_form_edit_screen() ) {
+			return;
+		}
+
+		$post_id = $this->edited_form_id();
+		$backup  = $post_id ? get_post_meta( $post_id, '_oli_cf_legacy_template', true ) : '';
+
+		if ( ! is_string( $backup ) || '' === $backup ) {
+			return;
+		}
+
+		$action = admin_url( 'admin-post.php' );
+		?>
+		<form id="oli-cf-restore-form" method="post" action="<?php echo esc_url( $action ); ?>" data-oli-confirm="<?php echo esc_attr__( 'Restore the fields and notifications from the saved copy?', 'oli-contact-form' ); ?>">
 			<?php wp_nonce_field( 'oli_cf_restore_form_' . $post_id ); ?>
 			<input type="hidden" name="action" value="oli_cf_restore_form" />
 			<input type="hidden" name="form_id" value="<?php echo esc_attr( (string) absint( $post_id ) ); ?>" />
-			<button type="submit" class="button"><?php esc_html_e( 'Restore the original form', 'oli-contact-form' ); ?></button>
-			<span class="description"><?php esc_html_e( 'Rebuilds the fields and notifications from the copy saved before the update. The copy itself is kept.', 'oli-contact-form' ); ?></span>
 		</form>
 		<?php
+	}
+
+	/**
+	 * Whether the current admin screen edits one form.
+	 *
+	 * @return bool
+	 */
+	private function is_form_edit_screen() {
+		if ( ! function_exists( 'get_current_screen' ) ) {
+			return false;
+		}
+
+		$screen = get_current_screen();
+
+		return is_object( $screen )
+			&& isset( $screen->base, $screen->post_type )
+			&& 'post' === $screen->base
+			&& 'oli_contact_form' === $screen->post_type;
+	}
+
+	/**
+	 * Form being edited, when the screen is the form editor.
+	 *
+	 * @return int
+	 */
+	private function edited_form_id() {
+		global $post;
+
+		if ( is_object( $post ) && isset( $post->ID ) ) {
+			return absint( $post->ID );
+		}
+
+		return 0;
 	}
 
 	/**

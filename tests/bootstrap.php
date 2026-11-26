@@ -234,6 +234,17 @@ if ( ! function_exists( 'absint' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_privacy_policy_url' ) ) {
+	/**
+	 * Privacy policy URL for tests. Empty unless a test sets the global.
+	 *
+	 * @return string
+	 */
+	function get_privacy_policy_url() {
+		return isset( $GLOBALS['oli_cf_test_privacy_url'] ) ? (string) $GLOBALS['oli_cf_test_privacy_url'] : '';
+	}
+}
+
 if ( ! function_exists( '__' ) ) {
 	/**
 	 * @param string $text Text.

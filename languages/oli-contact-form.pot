@@ -524,8 +524,13 @@ msgstr ""
 msgid "Your message"
 msgstr ""
 
-#: includes/class-oli-cf-fields.php:156
+#: includes/class-oli-cf-fields.php
 msgid "I consent to being contacted about this inquiry."
+msgstr ""
+
+#. translators: 1: opening link tag for the privacy policy, 2: closing link tag.
+#: includes/class-oli-cf-fields.php
+msgid "I consent to being contacted about this inquiry and agree to the %1$sprivacy policy%2$s."
 msgstr ""
 
 #: includes/class-oli-cf-fields.php:157

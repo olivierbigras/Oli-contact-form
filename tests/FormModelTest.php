@@ -408,10 +408,29 @@ class FormModelTest extends Oli_CF_Form_Model_TestCase {
 				$found = true;
 				$this->assertTrue( $field['required'] );
 				$this->assertSame( 'acceptance', $field['type'] );
+				$this->assertSame( 'I consent to being contacted about this inquiry.', $field['label'] );
 			}
 		}
 
 		$this->assertTrue( $found );
+
+		$GLOBALS['oli_cf_test_privacy_url'] = 'https://example.com/privacy-policy';
+
+		try {
+			$linked = '';
+
+			foreach ( Oli_CF_Fields::defaults() as $field ) {
+				if ( 'consent' === $field['name'] ) {
+					$linked = $field['label'];
+				}
+			}
+
+			$this->assertStringContainsString( 'href="https://example.com/privacy-policy"', $linked );
+			$this->assertStringContainsString( '>privacy policy<', $linked );
+		} finally {
+			unset( $GLOBALS['oli_cf_test_privacy_url'] );
+		}
+
 		$this->assertSame( 'Text', Oli_CF_Fields::type_label( 'text' ) );
 		$this->assertSame( 'Phone', Oli_CF_Fields::type_label( 'tel' ) );
 		$this->assertSame( 'Paragraph', Oli_CF_Fields::type_label( 'textarea' ) );

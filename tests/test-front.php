@@ -225,12 +225,115 @@ oli_cf_assert_same( 1, substr_count( $oli_cf_importer, "'oli_cf_imported_nonce' 
 $oli_cf_meta = file_get_contents( dirname( __DIR__ ) . '/admin/class-oli-cf-meta-boxes.php' );
 $oli_cf_admin_js = file_get_contents( dirname( __DIR__ ) . '/assets/js/oli-cf-admin.js' );
 oli_cf_assert_true( false !== strpos( $oli_cf_meta, 'method="post"' ), 'restore is submitted with POST' );
+oli_cf_assert_true( false !== strpos( $oli_cf_meta, 'id="oli-cf-restore-form"' ), 'restore form has its own id' );
+oli_cf_assert_true( false !== strpos( $oli_cf_meta, 'form="oli-cf-restore-form"' ), 'restore button submits the form outside the editor' );
 oli_cf_assert_true( false !== strpos( $oli_cf_meta, "wp_nonce_field( 'oli_cf_restore_form_'" ), 'restore form includes a nonce' );
+oli_cf_assert_true( false !== strpos( file_get_contents( dirname( __DIR__ ) . '/includes/class-oli-cf.php' ), "'admin_footer', " . '$meta_boxes' . ", 'render_restore_form'" ), 'restore form is printed from the admin footer' );
 oli_cf_assert_true( false !== strpos( $oli_cf_meta, "\$_POST['form_id']" ), 'restore reads the form id from POST' );
 oli_cf_assert_true( false === strpos( $oli_cf_meta, "\$_GET['form_id']" ), 'restore does not take the form id from the query string' );
 oli_cf_assert_true( false !== strpos( $oli_cf_meta, "current_user_can( 'edit_post'" ), 'restore checks the edit capability' );
 oli_cf_assert_true( false !== strpos( $oli_cf_meta, '#oli-cf-fields' ), 'restore returns focus to the field list' );
 oli_cf_assert_true( false !== strpos( $oli_cf_admin_js, 'data-oli-confirm' ) && false !== strpos( $oli_cf_admin_js, 'window.confirm' ), 'restore asks for confirmation' );
+oli_cf_assert_true( false !== strpos( $oli_cf_meta, 'oli-cf-default-option' ), 'the default value can be hidden per field type' );
+oli_cf_assert_true( false !== strpos( file_get_contents( dirname( __DIR__ ) . '/assets/css/oli-cf-admin.css' ), '.oli-cf-type-submit .oli-cf-default-option' ), 'submit rows hide the default value' );
+
+if ( ! function_exists( 'esc_html_e' ) ) {
+	/**
+	 * @param string $text Text.
+	 */
+	function esc_html_e( $text, $domain = '' ) {
+		unset( $domain );
+		echo esc_html( $text );
+	}
+}
+
+if ( ! function_exists( 'esc_attr__' ) ) {
+	/**
+	 * @param string $text Text.
+	 * @return string
+	 */
+	function esc_attr__( $text, $domain = '' ) {
+		unset( $domain );
+		return esc_attr( $text );
+	}
+}
+
+if ( ! function_exists( 'selected' ) ) {
+	/**
+	 * @param mixed $selected Selected.
+	 * @param mixed $current  Current.
+	 */
+	function selected( $selected, $current = true ) {
+		if ( (string) $selected === (string) $current ) {
+			echo ' selected="selected"';
+		}
+	}
+}
+
+if ( ! function_exists( 'checked' ) ) {
+	/**
+	 * @param mixed $checked Checked.
+	 * @param mixed $current Current.
+	 */
+	function checked( $checked, $current = true ) {
+		if ( (string) $checked === (string) $current ) {
+			echo ' checked="checked"';
+		}
+	}
+}
+
+if ( ! function_exists( 'wp_nonce_field' ) ) {
+	/**
+	 * @param string $action Action.
+	 * @param string $name   Field name.
+	 */
+	function wp_nonce_field( $action = '', $name = '_wpnonce' ) {
+		echo '<input type="hidden" name="' . esc_attr( $name ) . '" value="' . esc_attr( $action ) . '" />';
+	}
+}
+
+if ( ! function_exists( 'admin_url' ) ) {
+	/**
+	 * @param string $path Path.
+	 * @return string
+	 */
+	function admin_url( $path = '' ) {
+		return 'https://example.com/wp-admin/' . ltrim( (string) $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'get_current_screen' ) ) {
+	/**
+	 * @return object|null
+	 */
+	function get_current_screen() {
+		return isset( $GLOBALS['oli_cf_test_screen'] ) ? $GLOBALS['oli_cf_test_screen'] : null;
+	}
+}
+
+require_once dirname( __DIR__ ) . '/admin/class-oli-cf-meta-boxes.php';
+
+$oli_cf_editor                 = new Oli_CF_Meta_Boxes();
+$GLOBALS['oli_cf_test_meta'][7] = array(
+	'_oli_cf_legacy_template' => '[text* your-name]',
+);
+ob_start();
+$oli_cf_editor->render_form_editor( (object) array( 'ID' => 7 ) );
+$oli_cf_editor_html = ob_get_clean();
+oli_cf_assert_true( false === stripos( $oli_cf_editor_html, '<form' ), 'the field meta box HTML contains no form element' );
+oli_cf_assert_true( false !== strpos( $oli_cf_editor_html, 'form="oli-cf-restore-form"' ), 'the meta box button targets the external restore form' );
+
+$GLOBALS['oli_cf_test_screen'] = (object) array(
+	'base'      => 'post',
+	'post_type' => 'oli_contact_form',
+);
+$GLOBALS['post']               = (object) array( 'ID' => 7 );
+ob_start();
+$oli_cf_editor->render_restore_form();
+$oli_cf_restore_html = ob_get_clean();
+oli_cf_assert_true( false !== stripos( $oli_cf_restore_html, '<form id="oli-cf-restore-form"' ), 'the restore form is printed outside the meta box' );
+oli_cf_assert_true( false !== strpos( $oli_cf_restore_html, 'method="post"' ), 'the external restore form uses POST' );
+unset( $GLOBALS['oli_cf_test_screen'], $GLOBALS['post'] );
 
 $oli_cf_import_js = file_get_contents( dirname( __DIR__ ) . '/assets/js/oli-cf-importer.js' );
 oli_cf_assert_true( false !== strpos( $oli_cf_importer, 'id="oli-cf-import-all"' ), 'select-all checkbox id is oli-cf-import-all' );

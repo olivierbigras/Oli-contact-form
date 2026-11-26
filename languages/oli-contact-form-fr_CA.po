@@ -67,3 +67,9 @@ msgstr "Masqué"
 
 msgid "Submit"
 msgstr "Envoyer"
+
+msgid "I consent to being contacted about this inquiry."
+msgstr "Je consens à être contacté au sujet de cette demande."
+
+msgid "I consent to being contacted about this inquiry and agree to the %1$sprivacy policy%2$s."
+msgstr "Je consens à être contacté au sujet de cette demande et j'accepte la %1$spolitique de confidentialité%2$s."

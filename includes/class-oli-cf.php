@@ -107,6 +107,7 @@ class Oli_CF {
 		$this->loader->add_action( 'add_meta_boxes', $meta_boxes, 'add_meta_boxes' );
 		$this->loader->add_action( 'save_post_oli_contact_form', $meta_boxes, 'save_form_data', 10, 2 );
 		$this->loader->add_action( 'admin_notices', $meta_boxes, 'maybe_restore_notice' );
+		$this->loader->add_action( 'admin_footer', $meta_boxes, 'render_restore_form' );
 
 		$settings = new Oli_CF_Settings();
 		$this->loader->add_action( 'admin_menu', $settings, 'add_settings_page' );

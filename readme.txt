@@ -140,7 +140,7 @@ Yes. User-facing strings use the `oli-contact-form` text domain and standard Wor
 * Message keys and the control wrapper class use this plugin's own names (`success`, `required`, `oli-cf-control`).
 * Existing forms are converted once. The previous content is kept and can be restored from the editor. The admin shows a migration report.
 * JSON saved in form meta is slashed before `update_post_meta()`, so newlines and escaped characters survive. A form is converted once and is not rewritten on later loads. The `[contact-form-7]` shortcode remains available for existing embeds.
-* Field types use readable names. Options that do not apply to the selected type stay hidden. Restoring an original form asks for confirmation and reports success. A new form requires consent. French labels are included for France and Canada.
+* Field types use readable names. Options that do not apply to the selected type stay hidden, including the default value on a submit field. Restoring an original form uses a separate form, asks for confirmation, and reports success. A new form requires consent and links to the privacy policy when the site has one. French labels are included for France and Canada.
 * Import reads Gravity Forms, WPForms, Ninja Forms, Fluent Forms, Formidable Forms, and forms saved for the `contact-form-7` shortcode. Nothing is imported until you confirm a preview, and imports are drafts. Source data is not modified.
 
 = 0.3.12 =

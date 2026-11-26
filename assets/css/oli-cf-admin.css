@@ -61,7 +61,8 @@
 	display: none;
 }
 
-.oli-cf-type-submit .oli-cf-required-option {
+.oli-cf-type-submit .oli-cf-required-option,
+.oli-cf-type-submit .oli-cf-default-option {
 	display: none;
 }
 
