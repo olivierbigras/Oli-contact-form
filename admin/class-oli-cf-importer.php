@@ -94,7 +94,7 @@ class Oli_CF_Importer {
 		}
 
 		$step    = sanitize_key( (string) filter_input( INPUT_GET, 'step' ) );
-		$token   = sanitize_key( (string) filter_input( INPUT_GET, 'token' ) );
+		$token   = self::read_preview_token( filter_input( INPUT_GET, 'token' ) );
 		$preview = ( 'preview' === $step ) ? $this->preview_payload( $token ) : array();
 		?>
 		<div class="wrap">
@@ -283,7 +283,7 @@ class Oli_CF_Importer {
 			exit;
 		}
 
-		$token = wp_generate_password( 20, false );
+		$token = self::create_preview_token();
 		set_transient(
 			$this->transient_key(),
 			array(
@@ -320,7 +320,7 @@ class Oli_CF_Importer {
 			wp_die( esc_html__( 'You do not have permission to perform this action.', 'oli-contact-form' ) );
 		}
 
-		$token   = isset( $_POST['oli_cf_import_token'] ) ? sanitize_key( wp_unslash( $_POST['oli_cf_import_token'] ) ) : '';
+		$token   = isset( $_POST['oli_cf_import_token'] ) ? self::read_preview_token( sanitize_text_field( wp_unslash( $_POST['oli_cf_import_token'] ) ) ) : '';
 		$payload = $this->preview_payload( $token );
 		$count   = 0;
 		$skipped = 0;
@@ -358,6 +358,31 @@ class Oli_CF_Importer {
 			)
 		);
 		exit;
+	}
+
+	/**
+	 * Token stored with a preview.
+	 *
+	 * Hexadecimal, so the value in the redirect matches the value read back.
+	 *
+	 * @return string
+	 */
+	public static function create_preview_token() {
+		return bin2hex( random_bytes( 10 ) );
+	}
+
+	/**
+	 * Token from the preview URL or the import form.
+	 *
+	 * sanitize_key() would lowercase a mixed-case token and hash_equals() would fail.
+	 *
+	 * @param mixed $raw Raw token.
+	 * @return string
+	 */
+	public static function read_preview_token( $raw ) {
+		$token = preg_replace( '/[^A-Za-z0-9]/', '', sanitize_text_field( wp_unslash( (string) $raw ) ) );
+
+		return is_string( $token ) ? $token : '';
 	}
 
 	/**

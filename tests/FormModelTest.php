@@ -654,6 +654,112 @@ class FormModelTest extends Oli_CF_Form_Model_TestCase {
 	}
 
 	/**
+	 * A generated preview token still matches after the same read the screen uses.
+	 */
+	public function test_preview_token_round_trip() {
+		$importer = new Oli_CF_Importer();
+		$token    = Oli_CF_Importer::create_preview_token();
+		$read     = Oli_CF_Importer::read_preview_token( $token );
+
+		$this->assertSame( $token, $read );
+		$this->assertTrue( 1 === preg_match( '/\A[a-f0-9]{20}\z/', $token ) );
+
+		$mixed = 'AbC123xyzDEF456uvw';
+		$this->assertSame( $mixed, Oli_CF_Importer::read_preview_token( $mixed ) );
+
+		$key = ( new ReflectionMethod( Oli_CF_Importer::class, 'transient_key' ) );
+		$key->setAccessible( true );
+		$transient = $key->invoke( $importer );
+
+		$payload_method = new ReflectionMethod( Oli_CF_Importer::class, 'preview_payload' );
+		$payload_method->setAccessible( true );
+
+		set_transient(
+			$transient,
+			array(
+				'token'  => $token,
+				'source' => 'tagged',
+				'items'  => array(
+					array( 'title' => 'Hello' ),
+				),
+			),
+			900
+		);
+
+		$payload = $payload_method->invoke( $importer, Oli_CF_Importer::read_preview_token( $token ) );
+		$this->assertSame( 'Hello', $payload['items'][0]['title'] );
+
+		set_transient(
+			$transient,
+			array(
+				'token'  => $mixed,
+				'source' => 'tagged',
+				'items'  => array(
+					array( 'title' => 'Kept' ),
+				),
+			),
+			900
+		);
+
+		$payload = $payload_method->invoke( $importer, Oli_CF_Importer::read_preview_token( $mixed ) );
+		$this->assertSame( 'Kept', $payload['items'][0]['title'] );
+	}
+
+	/**
+	 * A short textarea keeps its line breaks in the email.
+	 */
+	public function test_short_textarea_keeps_line_breaks_in_mail() {
+		$form_id                                 = 81;
+		$GLOBALS['oli_cf_test_posts'][ $form_id ] = (object) array(
+			'ID'        => $form_id,
+			'post_type' => 'oli_contact_form',
+		);
+		Oli_CF_Fields::save(
+			$form_id,
+			array(
+				array(
+					'type'     => 'text',
+					'name'     => 'your-name',
+					'label'    => 'Name',
+					'required' => true,
+				),
+				array(
+					'type'     => 'textarea',
+					'name'     => 'message',
+					'label'    => 'Message',
+					'required' => false,
+				),
+			)
+		);
+		$note            = Oli_CF_Notifications::blank();
+		$note['enabled'] = true;
+		$note['to']      = 'admin@example.com';
+		$note['from']    = 'admin@example.com';
+		$note['subject'] = 'Hi';
+		$note['body']    = '{field:message}';
+		Oli_CF_Notifications::save( $form_id, array( $note ) );
+
+		$GLOBALS['oli_cf_test_wp_mail_calls'] = array();
+		$message                              = "Une ligne\nDeuxième";
+		$result                               = ( new Oli_CF_Submission() )->process_submission(
+			$form_id,
+			array(
+				'your-name' => "Ada\nLovelace",
+				'message'   => $message,
+			),
+			array()
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertTrue( ! empty( $GLOBALS['oli_cf_test_wp_mail_calls'] ) );
+		$mail = $GLOBALS['oli_cf_test_wp_mail_calls'][0]['message'];
+		$this->assertStringContainsString( 'Une ligne', $mail );
+		$this->assertStringContainsString( 'Deuxième', $mail );
+		$this->assertStringContainsString( '<br>', $mail );
+		$this->assertStringNotContainsString( 'Une ligne Deuxième', $mail );
+	}
+
+	/**
 	 * The source that still owns a previous storage key.
 	 *
 	 * @return Oli_CF_Import_Source

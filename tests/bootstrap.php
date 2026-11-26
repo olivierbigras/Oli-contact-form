@@ -58,7 +58,15 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
 	 * @return mixed
 	 */
 	function sanitize_text_field( $value ) {
-		return oli_cf_test_sanitize_string( $value );
+		$value = oli_cf_test_sanitize_string( $value );
+
+		if ( ! is_string( $value ) ) {
+			return $value;
+		}
+
+		$value = preg_replace( '/[\r\n\t ]+/', ' ', $value );
+
+		return is_string( $value ) ? trim( $value ) : '';
 	}
 }
 

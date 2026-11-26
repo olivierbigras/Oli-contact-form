@@ -319,7 +319,7 @@ class Oli_CF_Submission {
 			);
 		}
 
-		$data = $this->sanitize_posted_data( $post );
+		$data = $this->sanitize_posted_data( $post, $fields );
 
 		/**
 		 * Fires before validation.
@@ -435,14 +435,29 @@ class Oli_CF_Submission {
 	/**
 	 * Sanitize posted fields used in mail and validation.
 	 *
-	 * @param array<string, mixed> $post Posted data.
+	 * A textarea keeps its line breaks. Other fields use the single-line sanitizer.
+	 *
+	 * @param array<string, mixed>             $post   Posted data.
+	 * @param array<int, array<string, mixed>> $fields Form fields.
 	 * @return array<string, mixed>
 	 */
-	private function sanitize_posted_data( $post ) {
+	private function sanitize_posted_data( $post, $fields = array() ) {
 		$clean = array();
 
 		if ( ! is_array( $post ) ) {
 			return $clean;
+		}
+
+		$types = array();
+
+		if ( is_array( $fields ) ) {
+			foreach ( $fields as $field ) {
+				if ( ! is_array( $field ) || empty( $field['name'] ) ) {
+					continue;
+				}
+
+				$types[ (string) $field['name'] ] = isset( $field['type'] ) ? (string) $field['type'] : '';
+			}
 		}
 
 		$skip = array(
@@ -467,14 +482,16 @@ class Oli_CF_Submission {
 				continue;
 			}
 
+			$textarea = isset( $types[ $key ] ) && 'textarea' === $types[ $key ];
+
 			if ( is_array( $value ) ) {
-				$clean[ $key ] = array_map( 'sanitize_text_field', $value );
+				$clean[ $key ] = array_map( $textarea ? 'sanitize_textarea_field' : 'sanitize_text_field', $value );
 				continue;
 			}
 
 			$value = (string) $value;
 
-			if ( strlen( $value ) > 200 ) {
+			if ( $textarea ) {
 				$clean[ $key ] = sanitize_textarea_field( $value );
 			} else {
 				$clean[ $key ] = sanitize_text_field( $value );
