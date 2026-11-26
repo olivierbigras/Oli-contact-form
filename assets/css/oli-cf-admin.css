@@ -39,6 +39,17 @@
 	margin: 0 12px 8px 0;
 }
 
+.oli-cf-repeater-row label.oli-cf-field-label {
+	display: block;
+	margin: 0 0 8px;
+}
+
+.oli-cf-repeater-row label.oli-cf-field-label textarea.large-text {
+	display: block;
+	width: 100%;
+	max-width: none;
+}
+
 .oli-cf-repeater-row textarea.large-text,
 .oli-cf-repeater-row input.large-text {
 	width: 100%;

@@ -42,6 +42,7 @@
 		reindex(repeater);
 		syncFieldType(clone);
 		syncCondition(clone);
+		fitLabelInputs(clone);
 		var focusable = clone.querySelector('select, input, textarea');
 		if (focusable && focusable.focus) {
 			focusable.focus();
@@ -116,6 +117,34 @@
 			body: body
 		});
 	});
+
+	function fitLabelInput(area) {
+		if (!area || !area.classList || !area.classList.contains('oli-cf-label-input')) {
+			return;
+		}
+		area.rows = 2;
+		while (area.rows < 12 && area.scrollHeight > area.clientHeight + 1) {
+			area.rows += 1;
+		}
+	}
+
+	function fitLabelInputs(root) {
+		var scope = root && root.querySelectorAll ? root : document;
+		var areas = scope.querySelectorAll('textarea.oli-cf-label-input');
+		Array.prototype.forEach.call(areas, fitLabelInput);
+	}
+
+	document.addEventListener('input', function (event) {
+		var area = event.target;
+		if (!area || !area.classList || !area.classList.contains('oli-cf-label-input')) {
+			return;
+		}
+		fitLabelInput(area);
+	});
+
+	if (document.querySelector) {
+		fitLabelInputs(document);
+	}
 
 	document.addEventListener('click', function (event) {
 		var add = event.target.closest ? event.target.closest('.oli-cf-add-row') : null;

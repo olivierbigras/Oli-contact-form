@@ -243,6 +243,61 @@ class Oli_CF_Admin {
 	}
 
 	/**
+	 * Warn when a field label lost a link that was not a full http(s) URL.
+	 *
+	 * The list is a per-user transient written during save. It is shown once,
+	 * on the next admin page load, and then deleted.
+	 */
+	public function maybe_label_link_notice() {
+		if ( ! function_exists( 'get_current_user_id' ) || ! function_exists( 'get_transient' ) ) {
+			return;
+		}
+
+		$user_id = (int) get_current_user_id();
+
+		if ( $user_id <= 0 ) {
+			return;
+		}
+
+		$key    = Oli_CF_Fields::label_link_notice_key( $user_id );
+		$labels = get_transient( $key );
+
+		if ( ! is_array( $labels ) || ! $labels ) {
+			return;
+		}
+
+		delete_transient( $key );
+
+		$messages = array();
+
+		foreach ( $labels as $label ) {
+			$label = trim( (string) preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $label ) ) );
+
+			if ( '' === $label ) {
+				continue;
+			}
+
+			$messages[] = sprintf(
+				/* translators: %s: field label. */
+				__( 'A link was removed from the label of "%s" because its address is not a full http or https URL.', 'oli-contact-form' ),
+				$label
+			);
+		}
+
+		if ( ! $messages ) {
+			return;
+		}
+
+		echo '<div class="notice notice-warning is-dismissible">';
+
+		foreach ( $messages as $message ) {
+			echo '<p>' . esc_html( $message ) . '</p>';
+		}
+
+		echo '</div>';
+	}
+
+	/**
 	 * Show the import result on this plugin's screens only.
 	 */
 	public function maybe_import_notice() {

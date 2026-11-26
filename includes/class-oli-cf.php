@@ -96,6 +96,7 @@ class Oli_CF {
 		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_import_notice' );
 		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_migration_notice' );
 		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_staging_notice' );
+		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_label_link_notice' );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'maybe_dismiss_staging_notice' );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'maybe_dismiss_migration_notice' );
 		$this->loader->add_action( 'wp_ajax_oli_cf_dismiss_migration', $plugin_admin, 'ajax_dismiss_migration' );

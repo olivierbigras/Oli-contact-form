@@ -115,6 +115,7 @@ class Oli_CF_Fields {
 		$field['name']     = self::sanitize_name( $name );
 		$field['label']    = self::sanitize_label( $label );
 		$field['required'] = (bool) $required;
+		self::note_removed_field_label( $field['label'], $field['name'] );
 
 		if ( ! is_array( $args ) ) {
 			$args = array();
@@ -559,7 +560,9 @@ class Oli_CF_Fields {
 	 * Fields posted by the editor.
 	 *
 	 * Labels are not passed through sanitize_textarea_field() or wp_kses_post().
-	 * sanitize_label() keeps one simple http(s) link and drops anything else.
+	 * sanitize_label() keeps an http(s) link. A root-relative path is rewritten
+	 * with home_url() first. Any other link is reduced to its text, and the
+	 * field label is remembered for a per-user admin warning.
 	 *
 	 * @param mixed $posted Posted rows, already unslashed.
 	 * @return array<int, array<string, mixed>>
@@ -569,7 +572,13 @@ class Oli_CF_Fields {
 			return array();
 		}
 
-		return self::from_posted( self::sanitize_builder_input( $posted ) );
+		self::begin_removed_label_links();
+
+		try {
+			return self::from_posted( self::sanitize_builder_input( $posted ) );
+		} finally {
+			self::finish_removed_label_links();
+		}
 	}
 
 	/**
@@ -577,12 +586,19 @@ class Oli_CF_Fields {
 	 *
 	 * The label is decoded and passed to sanitize_label(). It is not run through
 	 * wp_kses_post() first, because that rewrites a rejected URL before the scheme check.
+	 * A removed link is remembered the same way as from_builder_post().
 	 *
 	 * @param mixed $markup Posted markup, already unslashed.
 	 * @return array<int, array<string, mixed>>
 	 */
 	public static function from_markup_post( $markup ) {
-		return self::from_markup( (string) $markup );
+		self::begin_removed_label_links();
+
+		try {
+			return self::from_markup( (string) $markup );
+		} finally {
+			self::finish_removed_label_links();
+		}
 	}
 
 	/**
@@ -765,29 +781,71 @@ class Oli_CF_Fields {
 	private static $label_links = array();
 
 	/**
+	 * Whether the label just sanitized lost an anchor.
+	 *
+	 * @var bool
+	 */
+	private static $label_link_removed = false;
+
+	/**
+	 * Whether the current editor save should remember removed label links.
+	 *
+	 * @var bool
+	 */
+	private static $collect_removed_label_links = false;
+
+	/**
+	 * Visible field labels that lost a link during the current save.
+	 *
+	 * @var string[]
+	 */
+	private static $removed_label_names = array();
+
+	/**
+	 * Transient key for one user's removed-label warning.
+	 *
+	 * The user ID is part of the key. The warning is never a site-wide option.
+	 *
+	 * @param int $user_id User ID.
+	 * @return string
+	 */
+	public static function label_link_notice_key( $user_id ) {
+		return 'oli_cf_label_link_notice_' . (int) $user_id;
+	}
+
+	/**
 	 * Sanitize a single line of human text.
 	 *
-	 * A privacy-policy link is kept. Every other tag, and quotes outside that link, are removed.
+	 * An http(s) link is kept, including a root-relative path such as
+	 * /privacy-policy/ after home_url() makes it absolute. Every other tag,
+	 * and quotes outside a kept link, are removed.
 	 *
 	 * @param mixed $text Raw text.
 	 * @return string
 	 */
 	public static function sanitize_label( $text ) {
-		self::$label_links = array();
-		$text              = str_replace( array( "\0", '[', ']', '{', '}' ), '', (string) $text );
-		$text              = preg_replace_callback(
+		self::$label_links        = array();
+		self::$label_link_removed = false;
+		$original                 = (string) $text;
+		$text                     = str_replace( array( "\0", '[', ']', '{', '}' ), '', $original );
+		$text                     = preg_replace_callback(
 			'/<a\s+href=(["\'])([^"\']+)\1[^>]*>([^<]*)<\/a>/i',
 			array( __CLASS__, 'capture_label_link' ),
 			$text
 		);
-		$text              = str_replace( '"', '', (string) $text );
-		$text              = wp_strip_all_tags( $text );
-		$text              = trim( (string) preg_replace( '/\s+/', ' ', (string) $text ) );
+		$text                     = str_replace( '"', '', (string) $text );
+		$text                     = wp_strip_all_tags( $text );
+		$text                     = trim( (string) preg_replace( '/\s+/', ' ', (string) $text ) );
 
 		if ( self::$label_links ) {
 			$text              = strtr( $text, self::$label_links );
 			self::$label_links = array();
 		}
+
+		$found                    = array();
+		$before                   = preg_match_all( '/<a\b/i', $original, $found );
+		$after                    = preg_match_all( '/<a\b/i', $text, $found );
+		self::$label_link_removed = ( (int) $before > (int) $after );
 
 		return $text;
 	}
@@ -795,11 +853,24 @@ class Oli_CF_Fields {
 	/**
 	 * Replace one allowed anchor with a token until the rest of the label is cleaned.
 	 *
+	 * The address is judged before esc_url(). A root-relative path is turned into
+	 * an absolute URL with home_url() first; that result is judged the same way.
+	 *
 	 * @param array<int, string> $matches Regex matches.
 	 * @return string
 	 */
 	private static function capture_label_link( $matches ) {
 		$raw = trim( (string) $matches[2] );
+
+		// A single leading slash is a path on this site (/privacy-policy/).
+		// A protocol-relative URL (//host) is not, and is rejected below.
+		if ( 1 === preg_match( '#\A/(?!/)#', $raw ) ) {
+			$absolute = home_url( $raw );
+
+			if ( is_string( $absolute ) && '' !== $absolute ) {
+				$raw = $absolute;
+			}
+		}
 
 		// Judge the address that was written, not the one esc_url() would invent.
 		// wp_kses_post() can turn javascript:alert(1) into alert(1), and esc_url()
@@ -819,6 +890,84 @@ class Oli_CF_Fields {
 		self::$label_links[ $token ] = '<a href="' . $href . '">' . trim( $inner ) . '</a>';
 
 		return $token;
+	}
+
+	/**
+	 * Start remembering field labels that lose a link on this save.
+	 */
+	private static function begin_removed_label_links() {
+		self::$collect_removed_label_links = true;
+		self::$removed_label_names         = array();
+	}
+
+	/**
+	 * Store the remembered labels for the current user and stop collecting.
+	 */
+	private static function finish_removed_label_links() {
+		$names                             = self::$removed_label_names;
+		self::$collect_removed_label_links = false;
+		self::$removed_label_names         = array();
+		self::store_removed_label_notice( $names );
+	}
+
+	/**
+	 * Remember one field when its label just lost a link.
+	 *
+	 * @param string $label Sanitized label.
+	 * @param string $name  Field name, used when the label text is empty.
+	 */
+	private static function note_removed_field_label( $label, $name ) {
+		if ( ! self::$collect_removed_label_links || ! self::$label_link_removed ) {
+			return;
+		}
+
+		$visible = self::plain_label_text( $label );
+
+		if ( '' === $visible ) {
+			$visible = self::plain_label_text( $name );
+		}
+
+		if ( '' === $visible || in_array( $visible, self::$removed_label_names, true ) ) {
+			return;
+		}
+
+		self::$removed_label_names[] = $visible;
+	}
+
+	/**
+	 * Visible text of a label, without markup.
+	 *
+	 * @param string $text Label or name.
+	 * @return string
+	 */
+	private static function plain_label_text( $text ) {
+		$text = trim( (string) preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $text ) ) );
+
+		return $text;
+	}
+
+	/**
+	 * Save the removed-label warning on a per-user transient.
+	 *
+	 * @param string[] $labels Field labels.
+	 */
+	private static function store_removed_label_notice( $labels ) {
+		if ( ! is_array( $labels ) || ! $labels ) {
+			return;
+		}
+
+		if ( ! function_exists( 'get_current_user_id' ) || ! function_exists( 'set_transient' ) ) {
+			return;
+		}
+
+		$user_id = (int) get_current_user_id();
+
+		if ( $user_id <= 0 ) {
+			return;
+		}
+
+		$ttl = defined( 'HOUR_IN_SECONDS' ) ? HOUR_IN_SECONDS : 3600;
+		set_transient( self::label_link_notice_key( $user_id ), array_values( $labels ), $ttl );
 	}
 
 	/**

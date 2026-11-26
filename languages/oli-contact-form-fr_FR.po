@@ -2,7 +2,7 @@
 # This file is distributed under the GPL v2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Oli Contact Form 0.4.0\n"
+"Project-Id-Version: Oli Contact Form 0.4.1\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/oli-contact-form\n"
 "Language: fr_FR\n"
 "MIME-Version: 1.0\n"
@@ -73,3 +73,6 @@ msgstr "Je consens à être contacté au sujet de cette demande."
 
 msgid "I consent to being contacted about this inquiry and agree to the %1$sprivacy policy%2$s."
 msgstr "Je consens à être contacté au sujet de cette demande et j'accepte la %1$spolitique de confidentialité%2$s."
+
+msgid "A link was removed from the label of \"%s\" because its address is not a full http or https URL."
+msgstr "Un lien a été retiré du libellé de « %s » parce que son adresse n'est pas une URL http ou https complète."
